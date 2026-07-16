@@ -54,6 +54,24 @@ class handler(BaseHTTPRequestHandler):
             self._json({"error": "unauthorized", "events": []}, status=401)
             return
 
+        # --- Mode diagnostic : /api/agenda?code=XXXX&cals=1 -------------
+        # Liste les agendas Google visibles, pour régler GOOGLE_CALENDARS.
+        if (params.get("cals") or [""])[0]:
+            try:
+                token = _google_token()
+                data = _req(
+                    "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                noms = [
+                    {"nom": c.get("summary", ""), "principal": c.get("primary", False)}
+                    for c in data.get("items", [])
+                ]
+                self._json({"agendas_google": noms})
+            except Exception as e:
+                self._json({"error": str(e)}, status=500)
+            return
+
         # --- Collecte des trois sources -------------------------------
         events  = []
         erreurs = []
@@ -228,6 +246,14 @@ def _google():
     tmin = f"{debut.isoformat()}T00:00:00Z"
     tmax = f"{fin.isoformat()}T00:00:00Z"
 
+    # Agendas à remonter. Vide = tous.
+    # Ex. : GOOGLE_CALENDARS="Oxybol"  ou  "Oxybol,Famille"
+    voulus = [
+        c.strip().lower()
+        for c in os.environ.get("GOOGLE_CALENDARS", "").split(",")
+        if c.strip()
+    ]
+
     # 1. Lister les agendas de l'utilisateur
     cals = _req(
         "https://www.googleapis.com/calendar/v3/users/me/calendarList",
@@ -239,6 +265,10 @@ def _google():
     for cal in cals.get("items", []):
         cal_id  = cal.get("id")
         cal_nom = cal.get("summary", "")
+
+        # Filtre par nom d'agenda
+        if voulus and cal_nom.strip().lower() not in voulus:
+            continue
 
         # On saute les agendas de fêtes/anniversaires : trop de bruit
         if cal.get("id", "").endswith("#holiday@group.v.calendar.google.com"):
