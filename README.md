@@ -23,6 +23,22 @@ Outlook ─┘     (serverless)      (PWA)
   interroge les trois API, renvoie un JSON fusionné.
 - `index.html` — l'app. Vue liste + vue calendrier, filtres par source.
 
+### Onglet « Tableau de bord »
+
+Vue d'ensemble des chronos Oxybol, alimentée **directement par la base
+Notion** (`/api/agenda?code=XXXX&mode=chronos`) :
+
+- bascule **Tous les chronos / Mes chronos** (« mes » = Christophe dans la
+  propriété *Chronométreur*)
+- filtre par **statut** (Validé et Option par défaut ; Reporté, Annulé, Perdu
+  à activer à la demande)
+- indicateurs : à venir, ce mois-ci, total de l'année, à venir pour moi,
+  **à affecter** (Validé/Option sans chronométreur)
+- histogramme mensuel (moi / autres chronométreurs), liste et calendrier
+  colorés par statut
+
+Fenêtre : du 1er janvier de l'année en cours à +365 jours.
+
 Les tokens ne sont **jamais** dans le code : uniquement dans les
 variables d'environnement Vercel.
 

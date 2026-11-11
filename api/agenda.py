@@ -6,7 +6,7 @@ Agrège trois sources en un seul flux :
   - Google Calendar → agenda perso Gmail
   - Outlook / Graph → agenda pro Oxybol
 
-Accessible sur : /api/agenda?code=XXXX
+Accessible sur : /api/agenda?code=XXXX  (+ &mode=chronos pour le tableau de bord)
 
 Variables d'environnement attendues (Vercel) :
   ACCESS_CODE
@@ -70,6 +70,22 @@ class handler(BaseHTTPRequestHandler):
                 self._json({"agendas_google": noms})
             except Exception as e:
                 self._json({"error": str(e)}, status=500)
+            return
+
+        # --- Mode tableau de bord : /api/agenda?code=XXXX&mode=chronos ---
+        # Tous les chronos Notion (pas seulement ceux de Christophe).
+        if (params.get("mode") or [""])[0] == "chronos":
+            try:
+                events = _notion_chronos()
+                events.sort(key=lambda e: (e["start"], e["title"]))
+                self._json({
+                    "events":      events,
+                    "errors":      [],
+                    "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
+                })
+            except Exception as e:
+                self._json({"error": str(e), "events": [], "errors": [f"notion: {e}"]},
+                           status=500)
             return
 
         # --- Collecte des trois sources -------------------------------
@@ -139,21 +155,36 @@ def _bornes():
 # ══════════════════════════════════════════════════════════════════════
 
 def _notion():
+    """Agenda partagé : uniquement les chronos où Christophe est affecté."""
+    debut, _ = _bornes()
+    return _notion_pages({
+        "and": [
+            {"property": "Chronométreur", "people": {"contains": CHRISTOPHE_ID}},
+            {"property": "Date",          "date":   {"on_or_after": debut.isoformat()}},
+            {"property": "Statut",        "select": {"does_not_equal": "Annulé"}},
+            {"property": "Statut",        "select": {"does_not_equal": "Perdu"}},
+        ]
+    })
+
+
+def _notion_chronos():
+    """Tableau de bord : TOUS les chronos de la base, tous statuts confondus,
+    depuis le 1er janvier de l'année en cours (pour les stats mensuelles).
+    Le filtrage par statut se fait côté navigateur."""
+    debut = date(date.today().year, 1, 1)
+    return _notion_pages({
+        "property": "Date", "date": {"on_or_after": debut.isoformat()}
+    })
+
+
+def _notion_pages(filtre):
     token = os.environ.get("NOTION_TOKEN")
     if not token:
         raise RuntimeError("NOTION_TOKEN absent")
 
-    debut, _ = _bornes()
-
     body = {
-        "filter": {
-            "and": [
-                {"property": "Chronométreur", "people": {"contains": CHRISTOPHE_ID}},
-                {"property": "Date",          "date":   {"on_or_after": debut.isoformat()}},
-                {"property": "Statut",        "select": {"does_not_equal": "Annulé"}},
-                {"property": "Statut",        "select": {"does_not_equal": "Perdu"}},
-            ]
-        },
+        "filter": filtre,
+        "page_size": 100,
         "sorts": [{"property": "Date", "direction": "ascending"}],
     }
 
@@ -191,6 +222,8 @@ def _notion():
             def ms(key):
                 return [x.get("name", "") for x in p.get(key, {}).get("multi_select", [])]
 
+            equipe = p.get("Chronométreur", {}).get("people", [])
+
             out.append({
                 "source":   "notion",
                 "title":    titre,
@@ -199,6 +232,9 @@ def _notion():
                 "allDay":   True,
                 "url":      page.get("url", ""),
                 "statut":   (p.get("Statut", {}).get("select") or {}).get("name", ""),
+                "chronometreurs": [x.get("name", "") for x in equipe if x.get("name")],
+                "nb_chrono":      len(equipe),
+                "mine":           any(x.get("id") == CHRISTOPHE_ID for x in equipe),
                 "tags":     ms("Tags"),
                 "techno":   ms("Techno"),
                 "materiel": ms("Matériel Chrono"),
