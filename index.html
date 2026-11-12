@@ -505,6 +505,47 @@
   .badge.stat { background: transparent; border: 1px solid var(--c); color: var(--c); }
   .no-team { color: #fbbf24; }
 
+
+  /* ─── Éléments cliquables ─── */
+  [data-a], [data-j], .cal-cell[data-jc], .mini[data-w] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  [data-a]:hover, .mini[data-w]:hover { filter: brightness(1.18); }
+  [data-a]:focus-visible, [data-w]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .kpi[data-a]:active, .hrow[data-a]:active, .rec[data-a]:active { transform: scale(.98); }
+  .hrow[data-a] { padding: 3px 4px; margin: 0 -4px; }
+  .hrow[data-a]:hover { background: var(--card2); }
+  .bar-col[data-a]:hover .bar-lbl { color: var(--text); }
+  .heat i[data-j]:hover { outline: 1.5px solid var(--text); }
+  .tag[data-a]:hover { border-color: var(--accent); }
+  .al[data-a] { padding: 6px 4px; border-radius: 6px; }
+  .al[data-a]:hover { background: var(--card2); }
+  .al small, .panel h4 small { display: block; color: var(--muted); font-size: .66rem; }
+  .panel h4 { font-size: .74rem; color: var(--text); margin: 10px 0 6px; }
+  .mini[data-a] { padding: 8px 4px; border-radius: 8px; }
+  .voirtout { margin-top: 6px; padding: 8px; text-align: center; font-size: .76rem; font-weight: 700; color: var(--accent);
+              background: var(--card2); border-radius: 8px; }
+  .sheet-box.grand { max-height: 86vh; display: flex; flex-direction: column; }
+  .sheet-box .sous { color: var(--muted); font-size: .74rem; margin-bottom: 8px; }
+  .defile { overflow-y: auto; flex: 1; min-height: 0; margin: 0 -6px; padding: 0 6px; }
+  .defile .mini { padding: 8px 4px; }
+  .defile .mini .jx { min-width: 62px; }
+  .sheet-back { background: transparent; border: 0; color: var(--accent); font-size: .82rem; font-weight: 700; padding: 0 0 8px; }
+  .sheet-box a { }
+  .mini-btn { background: var(--card2); border: 1px solid var(--border); color: var(--text); border-radius: 999px;
+              padding: 6px 12px; font-size: .76rem; font-weight: 600; }
+  .dispo { background: var(--card2); border-radius: 8px; padding: 8px 10px; font-size: .78rem; margin: 6px 0 4px; line-height: 1.45; }
+  .dispo b { color: var(--perso); margin-right: 6px; }
+  .dispo small { display: block; color: var(--muted); font-size: .68rem; }
+  .matrice { display: grid; grid-template-columns: 54px repeat(12, 1fr) 34px; gap: 2px; align-items: center; font-size: .6rem; }
+  .matrice > span { color: var(--muted); text-align: center; }
+  .mx-l { font-size: .72rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mx-t { font-size: .66rem; color: var(--muted); text-align: right; }
+  .mx { display: block; aspect-ratio: 1; border-radius: 3px; text-align: center; font-style: normal; line-height: 1;
+        display: flex; align-items: center; justify-content: center; font-size: .56rem; color: #0008; font-weight: 700; background: var(--card2); }
+  .mx.n1 { background: color-mix(in srgb, var(--chrono) 30%, var(--card2)); color: var(--text); }
+  .mx.n2 { background: color-mix(in srgb, var(--chrono) 55%, var(--card2)); color: var(--text); }
+  .mx.n3 { background: color-mix(in srgb, var(--chrono) 80%, var(--card2)); }
+  .mx.n4 { background: var(--chrono); }
+
   @media (min-width: 640px) {
     .sheet { align-items: center; padding: 20px; }
     .sheet-box { border-radius: 14px; }
@@ -934,7 +975,7 @@ function htmlCalendrier() {
       ? `<div class="cal-more">+${duJour.length - 3}</div>` : '';
 
     cells += `
-      <div class="cal-cell${hors ? ' out' : ''}${we ? ' we' : ''}${auj ? ' today' : ''}">
+      <div class="cal-cell${hors ? ' out' : ''}${we ? ' we' : ''}${auj ? ' today' : ''}" data-jc="${cleJour(jour)}">
         <div class="cal-num">${jour.getDate()}</div>
         ${items}${reste}
       </div>`;
@@ -968,7 +1009,10 @@ function brancherCalendrier() {
   document.getElementById('calToday').onclick = () => aller(new Date());
 
   document.querySelectorAll('.cal-ev').forEach(el => {
-    el.onclick = () => detail(CUR_LIST[+el.dataset.i]);
+    el.onclick = e => { e.stopPropagation(); detail(CUR_LIST[+el.dataset.i]); };
+  });
+  document.querySelectorAll('.cal-cell[data-jc]').forEach(el => {
+    el.onclick = () => { if (VIEW === 'dash') ouvrirJour(el.dataset.jc); };
   });
 }
 
@@ -977,6 +1021,7 @@ function brancherCalendrier() {
 const lblStatut = s => s === '—' ? 'Sans statut' : s;
 
 function htmlDash() {
+  ACTIONS = [];
   const an        = DASH_YEAR;
   const courante  = an === TODAY.getFullYear();
 
@@ -1000,15 +1045,15 @@ function htmlDash() {
            ['Validé', 'Validé non signé', 'Option'].includes(e.statut);
   });
 
-  const kpi = (n, l, cls = '') =>
-    `<div class="kpi ${cls}"><b>${n}</b><span>${l}</span></div>`;
+  const kpi = (n, l, cls = '', liste = null) =>
+    `<div class="kpi ${cls}" ${liste ? clic(() => ouvrirListe(l + ' · ' + an, liste)) : ''}><b>${n}</b><span>${l}</span></div>`;
 
   const kpis = `<div class="kpis">
-    ${kpi(evs.length, `chronos en ${an}`)}
-    ${courante ? kpi(aVenir.length, 'à venir') : ''}
-    ${courante ? kpi(ceMois.length, 'ce mois-ci') : ''}
-    ${DASH_SCOPE === 'all' ? kpi(pourMoi.length, 'pour moi') : ''}
-    ${kpi(aAffecter.length, 'à affecter', aAffecter.length ? 'alert' : '')}
+    ${kpi(evs.length, `chronos en ${an}`, '', evs)}
+    ${courante ? kpi(aVenir.length, 'à venir', '', aVenir) : ''}
+    ${courante ? kpi(ceMois.length, 'ce mois-ci', '', ceMois) : ''}
+    ${DASH_SCOPE === 'all' ? kpi(pourMoi.length, 'pour moi', '', pourMoi) : ''}
+    ${kpi(aAffecter.length, 'à affecter', aAffecter.length ? 'alert' : '', aAffecter)}
   </div>`;
 
   // --- Histogramme mensuel : moi / autres ------------------------------
@@ -1023,7 +1068,8 @@ function htmlDash() {
   const colonnes = parMois.map((m, i) => {
     const tot = m.moi + m.autres;
     const h = v => (v / max * 100).toFixed(1) + '%';
-    return `<div class="bar-col${courante && i === TODAY.getMonth() ? ' cur' : ''}">
+    const duMois = evs.filter(e => { const d = dayOf(e.start); return d && d.getFullYear() === an && d.getMonth() === i; });
+    return `<div class="bar-col${courante && i === TODAY.getMonth() ? ' cur' : ''}" ${clic(() => ouvrirListe(MONTHS[i] + ' ' + an, duMois))}>
       <div class="bar-val">${tot || ''}</div>
       <div class="bar" style="height:${h(tot)}">
         <i class="b-others" style="height:${tot ? (m.autres / tot * 100).toFixed(1) : 0}%"></i>
@@ -1118,8 +1164,8 @@ function htmlDashListe(liste) {
 
     const tags = chipsEv(ev);
 
-    const tag = ev.url ? 'a' : 'div';
-    const attrs = ev.url ? ` href="${esc(ev.url)}" target="_blank" rel="noopener"` : '';
+    const tag = 'div';
+    const attrs = ' ' + clic(() => detail(ev));
 
     html += `
       <${tag}${attrs} class="ev ${clsEv(ev)}${auj ? ' today' : ''}">
@@ -1166,11 +1212,6 @@ function brancherDash() {
   if (DASH_SUB === 'stats') {
     chargerAnnees();
     chargerPerdus();
-    // Toucher une année du comparatif l'ouvre
-    document.querySelectorAll('.hrow[data-y]').forEach(r => {
-      r.style.cursor = 'pointer';
-      r.onclick = () => { window.scrollTo(0, 0); dashSetYear(+r.dataset.y); };
-    });
   }
 }
 
@@ -1186,6 +1227,7 @@ const nbJours = ev => {
 const cleJour = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dateLongue = d => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 const pluriel = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+const prenom = n => String(n || '').split(' ')[0];
 
 function chaqueJour(ev, fn) {
   const d = dayOf(ev.start); if (!d) return;
@@ -1193,6 +1235,13 @@ function chaqueJour(ev, fn) {
   const n = Math.min(40, Math.max(0, Math.round((f - d) / 864e5)));
   for (let i = 0; i <= n; i++) fn(new Date(d.getFullYear(), d.getMonth(), d.getDate() + i));
 }
+
+/** Un chrono occupe-t-il ce jour ? (Notion : la date de fin est incluse) */
+const couvreN = (e, d) => { const a = dayOf(e.start), f = dayOf(e.end) || a; return !!a && d >= a && d <= f; };
+
+/** Éléments cliquables : chaque `clic(fn)` renvoie des attributs HTML ; un seul écouteur global les déclenche. */
+let ACTIONS = [];
+const clic = fn => { ACTIONS.push(fn); return `data-a="${ACTIONS.length - 1}" role="button" tabindex="0"`; };
 
 /** Compte les valeurs d'un champ (techno, type, équipe…) : [{l, n, j}] triés. */
 function compter(evs, get) {
@@ -1207,11 +1256,12 @@ function compter(evs, get) {
   return Object.values(m).sort((a, b) => b.n - a.n || b.j - a.j || a.l.localeCompare(b.l));
 }
 
+/** Barres horizontales ; chaque ligne peut porter une action (`act`) et ouvrir sa liste. */
 function hbars(items, cls = '', wide = false) {
   if (!items.length) return '<div class="note">Aucune donnée</div>';
   const max = Math.max(...items.map(i => i.n));
   return `<div class="hbars${wide ? ' wide' : ''}">` + items.map(i => `
-    <div class="hrow">
+    <div class="hrow" ${i.act || ''}>
       <span class="hl" title="${esc(i.l)}">${esc(i.l)}</span>
       <span class="ht"><i class="${i.cls || cls}" style="width:${(i.n / max * 100).toFixed(1)}%"></i></span>
       <span class="hn">${i.n}${i.sub ? `<small>${esc(i.sub)}</small>` : ''}</span>
@@ -1228,20 +1278,56 @@ const jx = ev => {
   return f >= TODAY ? (n === 0 ? 'Auj.' : 'En cours') : 'Passé';
 };
 
-function ligneMini(ev, bonus = '') {
+const equipeTxt = ev => ev.chronometreurs && ev.chronometreurs.length
+  ? '👤 ' + esc(ev.chronometreurs.join(', ')) : '⚠ non affecté';
+
+/** Ligne de chrono (J-N) ; touche = ouvre la fiche. */
+function ligneMini(ev) {
   const d = dayOf(ev.start);
-  const equipe = ev.chronometreurs && ev.chronometreurs.length
-    ? '👤 ' + esc(ev.chronometreurs.join(', ')) : '⚠ non affecté';
-  const tag = ev.url ? 'a' : 'div';
-  const at  = ev.url ? ` href="${esc(ev.url)}" target="_blank" rel="noopener"` : '';
-  return `<${tag}${at} class="mini ${'st-' + stSlug(ev.statut)}">
+  return `<div class="mini st-${stSlug(ev.statut)}" ${clic(() => detail(ev))}>
     <span class="jx">${jx(ev)}</span>
-    <span class="mt">${esc(ev.title)}<small>${dateLongue(d)} · ${esc(ev.statut || 'sans statut')} · ${equipe}</small></span>
-    ${bonus}
-  </${tag}>`;
+    <span class="mt">${esc(ev.title)}<small>${dateLongue(d)} · ${esc(ev.statut || 'sans statut')} · ${equipeTxt(ev)}</small></span>
+  </div>`;
 }
 
-/** Cases « calendrier de charge » façon GitHub : une case par jour, plus c'est orange, plus c'est chargé. */
+/** Qui est libre ? Une personne est « prise » si elle est sur un autre chrono (hors annulé / perdu / reporté) ces jours-là. */
+function toutesFiches() {
+  const m = new Map();
+  for (const l of [DASH, ...Object.values(DASH_CACHE)]) for (const e of l || []) m.set(e.url || (e.title + e.start), e);
+  return [...m.values()];
+}
+function equipeConnue() {
+  const an = TODAY.getFullYear(), s = new Set();
+  for (const y of [an, an - 1]) for (const e of DASH_CACHE[y] || []) (e.chronometreurs || []).forEach(n => s.add(n));
+  (DASH || []).forEach(e => (e.chronometreurs || []).forEach(n => s.add(n)));
+  return [...s].sort((a, b) => a.localeCompare(b));
+}
+function disponibilites(cles, exclureEv = null) {
+  const pris = new Map();
+  for (const e of toutesFiches()) {
+    if (e === exclureEv || e.source !== 'notion' || ['Annulé', 'Perdu', 'Reporté'].includes(e.statut)) continue;
+    if (!(e.chronometreurs || []).length) continue;
+    let ok = false;
+    chaqueJour(e, d => { if (cles.has(cleJour(d))) ok = true; });
+    if (ok) for (const n of e.chronometreurs) { if (!pris.has(n)) pris.set(n, []); pris.get(n).push(e.title); }
+  }
+  const equipe = equipeConnue();
+  return { libres: equipe.filter(n => !pris.has(n)), pris: equipe.filter(n => pris.has(n)).map(n => ({ n, titres: pris.get(n) })) };
+}
+const clesDe = ev => { const s = new Set(); chaqueJour(ev, d => s.add(cleJour(d))); return s; };
+
+/** Fenêtre d'un jour : les chronos de ce jour + qui est libre. */
+function ouvrirJour(cle) {
+  const d = new Date(cle + 'T00:00:00');
+  if (isNaN(d)) return;
+  const liste = dashVisibles().filter(e => couvreN(e, d));
+  const dp = disponibilites(new Set([cle]));
+  const extra = `<div class="dispo"><b>Libres ce jour-là</b> ${dp.libres.length ? esc(dp.libres.join(', ')) : 'personne'}` +
+    (dp.pris.length ? `<small>Déjà sur un chrono : ${esc(dp.pris.map(x => x.n).join(', '))}</small>` : '') + '</div>';
+  ouvrirListe(`${DOW[(d.getDay() + 6) % 7]} ${dateLongue(d)} ${d.getFullYear()}`, liste, extra);
+}
+
+/** Cases « calendrier de charge » façon GitHub : une case par jour ; touche une case pour voir le jour. */
 function htmlHeat(evs, an) {
   const parJour = {};
   for (const e of evs) chaqueJour(e, d => { if (d.getFullYear() === an) parJour[cleJour(d)] = (parJour[cleJour(d)] || 0) + 1; });
@@ -1256,7 +1342,7 @@ function htmlHeat(evs, an) {
     const k = c * 7 + r - off;
     if (k < 0 || k >= nbj) { cases += '<i class="h0 vide"></i>'; continue; }
     const d = new Date(an, 0, 1 + k), n = parJour[cleJour(d)] || 0;
-    cases += `<i class="h${Math.min(n, 4)}${sameDay(d, TODAY) ? ' auj' : ''}" title="${dateLongue(d)} : ${n ? pluriel(n, 'chrono') : 'rien'}"></i>`;
+    cases += `<i class="h${Math.min(n, 4)}${sameDay(d, TODAY) ? ' auj' : ''}" data-j="${cleJour(d)}" title="${dateLongue(d)} : ${n ? pluriel(n, 'chrono') : 'rien'}"></i>`;
   }
   const mois = MONTHS.map((m, i) => {
     const col = Math.floor((off + (new Date(an, i, 1) - jan1) / 864e5) / 7);
@@ -1267,10 +1353,10 @@ function htmlHeat(evs, an) {
   return panel(`Calendrier de charge — ${an}`,
     `<div class="heatwrap"><div class="heatm">${mois}</div>
      <div class="heat" style="grid-template-columns:repeat(${cols},1fr)">${cases}</div></div>`,
-    `<span>${pluriel(jours, 'jour')} avec chrono</span><span class="heatleg">moins <i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> plus</span>`);
+    `<span>${pluriel(jours, 'jour')} avec chrono · touche une case</span><span class="heatleg">moins <i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> plus</span>`);
 }
 
-/** Un chronométreur sur deux chronos le même jour (ou plus de 3 chronos en parallèle). */
+/** Un chronométreur sur deux chronos le même jour. */
 function conflits() {
   const actifs = DASH.filter(e => DASH_ST[e.statut || '—'] !== false);
   const courante = DASH_YEAR === TODAY.getFullYear();
@@ -1288,7 +1374,44 @@ function conflits() {
   return Object.values(m).filter(x => x.evs.size > 1).sort((a, b) => a.d - b.d || a.nom.localeCompare(b.nom));
 }
 
-function htmlComparatif(evsBrut) {
+/** Même matériel demandé sur deux chronos en même temps (le stock n'est pas dans Notion : à vérifier). */
+function conflitsMateriel(evs, courante) {
+  const m = {};
+  for (const e of evs) for (const mat of new Set(e.materiel || [])) chaqueJour(e, d => {
+    if (courante && d < TODAY) return;
+    const k = mat + '|' + cleJour(d);
+    (m[k] = m[k] || { mat, d, evs: new Set() }).evs.add(e);
+  });
+  const groupes = {};
+  for (const x of Object.values(m)) {
+    if (x.evs.size < 2) continue;
+    const cle = x.mat + '|' + [...x.evs].map(e => e.url || e.title).sort().join('|');
+    if (!groupes[cle] || x.d < groupes[cle].d) groupes[cle] = x;
+  }
+  return Object.values(groupes).sort((a, b) => a.d - b.d);
+}
+
+/** Qui travaille combien, mois par mois (jours de présence). */
+function htmlMatrice(tous, an) {
+  const pers = {};
+  for (const e of tous) for (const nom of new Set(e.chronometreurs || [])) {
+    const p = pers[nom] = pers[nom] || { nom, mois: Array.from({ length: 12 }, () => ({ j: 0, evs: new Set() })), j: 0 };
+    chaqueJour(e, d => { if (d.getFullYear() === an) { const c = p.mois[d.getMonth()]; c.j++; c.evs.add(e); p.j++; } });
+  }
+  const lignes = Object.values(pers).filter(p => p.j).sort((a, b) => b.j - a.j).slice(0, 8);
+  if (!lignes.length) return '';
+  const niv = j => j === 0 ? 0 : j <= 3 ? 1 : j <= 7 ? 2 : j <= 12 ? 3 : 4;
+  const entete = MONTHS.map(m => `<span>${m[0].toUpperCase()}</span>`).join('');
+  const rows = lignes.map(p =>
+    `<div class="mx-l" ${clic(() => ouvrirListe(`${p.nom} · ${an}`, [...new Set(p.mois.flatMap(c => [...c.evs]))]))}>${esc(prenom(p.nom))}</div>` +
+    p.mois.map((c, i) => `<i class="mx n${niv(c.j)}" ${c.j ? clic(() => ouvrirListe(`${prenom(p.nom)} · ${MONTHS[i]} ${an}`, [...c.evs])) : ''}>${c.j || ''}</i>`).join('') +
+    `<div class="mx-t">${p.j} j</div>`).join('');
+  return panel(`Charge par personne et par mois — ${an}`,
+    `<div class="matrice"><span></span>${entete}<span></span>${rows}</div>`,
+    '<span>Jours de présence · touche une case pour voir les chronos</span>');
+}
+
+function htmlComparatif() {
   const ya = TODAY.getFullYear();
   const lignes = [];
   for (let y = YEAR_MIN; y <= ya + 3; y++) {
@@ -1314,7 +1437,7 @@ function htmlComparatif(evsBrut) {
   const corps = delta + '<div class="hbars">' + lignes.map(l => {
     if (!l.charge) return `<div class="hrow"><span class="hl">${l.y}</span><span class="ht"></span><span class="hn">${ANNEES_FINI ? '—' : '…'}</span></div>`;
     const w = v => (v / max * 100).toFixed(1) + '%';
-    return `<div class="hrow${l.y === DASH_YEAR ? ' sel' : ''}" data-y="${l.y}">
+    return `<div class="hrow${l.y === DASH_YEAR ? ' sel' : ''}" ${clic(() => { window.scrollTo(0, 0); dashSetYear(l.y); })}>
       <span class="hl">${l.y}</span>
       <span class="ht"><i class="h-autres" style="width:${w(l.n)}"><i class="h-moi" style="width:${l.n ? (l.moi / l.n * 100).toFixed(1) : 0}%"></i></i></span>
       <span class="hn">${l.n}<small>${l.moi} moi · ${l.j} j</small></span>
@@ -1331,12 +1454,14 @@ function htmlStats() {
   const base = DASH.filter(e => DASH_SCOPE === 'all' || e.mine);   // tous statuts
   const evs  = dashVisibles();
   const parts = [];
+  const delaiFin = e => dayOf(e.end) || dayOf(e.start);
 
   // 1. Prochains départs ------------------------------------------------
   if (courante) {
-    const suite = evs.filter(e => (dayOf(e.end) || dayOf(e.start)) >= TODAY)
-                     .sort((a, b) => a.start.localeCompare(b.start)).slice(0, 4);
-    if (suite.length) parts.push(panel('Prochains chronos', suite.map(e => ligneMini(e)).join('')));
+    const suite = evs.filter(e => delaiFin(e) >= TODAY).sort((a, b) => a.start.localeCompare(b.start));
+    if (suite.length) parts.push(panel('Prochains chronos',
+      suite.slice(0, 4).map(e => ligneMini(e)).join('') +
+      (suite.length > 4 ? `<div class="voirtout" ${clic(() => ouvrirListe(`Chronos à venir (${an})`, suite))}>Voir les ${suite.length} chronos à venir ›</div>` : '')));
   }
 
   // 2. Chiffres clés ---------------------------------------------------
@@ -1354,55 +1479,87 @@ function htmlStats() {
     parJour[cleJour(d)] = (parJour[cleJour(d)] || { d, n: 0 }); parJour[cleJour(d)].n++;
     if (d.getDay() === 0 || d.getDay() === 6) we++;
   });
-  const k = (n, l, c = '') => `<div class="kpi ${c}"><b>${n}</b><span>${l}</span></div>`;
+  const duMois = i => evs.filter(e => { const d = dayOf(e.start); return d && d.getFullYear() === an && d.getMonth() === i; });
+  const surWeekend = evs.filter(e => { let w = false; chaqueJour(e, d => { if (d.getFullYear() === an && (d.getDay() === 0 || d.getDay() === 6)) w = true; }); return w; });
+  const k = (n, l, act) => `<div class="kpi" ${act}><b>${n}</b><span>${l}</span></div>`;
+  const tousLesChronos = clic(() => ouvrirListe(`Chronos ${an}`, evs));
   parts.push(`<div class="kpis">
-    ${k(evs.length, 'chronos')}
-    ${k(jours, 'jours de chrono')}
-    ${k((evs.length / 12).toFixed(1).replace('.', ','), 'par mois en moyenne')}
-    ${k(moisMax ? MONTHS[parMois.indexOf(moisMax)].slice(0, 4) + '. · ' + moisMax : '—', 'mois record')}
-    ${k(we, 'jours de week-end')}
-    ${k(tailleMoy ? tailleMoy.toFixed(1).replace('.', ',') : '—', 'chronométreurs par chrono')}
+    ${k(evs.length, 'chronos', tousLesChronos)}
+    ${k(jours, 'jours de chrono', clic(() => ouvrirListe(`Chronos ${an} · ${jours} jours`, [...evs].sort((a, b) => nbJours(b) - nbJours(a)))))}
+    ${k((evs.length / 12).toFixed(1).replace('.', ','), 'par mois en moyenne', clic(() => ouvrirListe(`Chronos ${an}`, evs)))}
+    ${k(moisMax ? MONTHS[parMois.indexOf(moisMax)].slice(0, 3) + '. · ' + moisMax : '—', 'mois record', moisMax ? clic(() => ouvrirListe(`${MONTHS[parMois.indexOf(moisMax)]} ${an}`, duMois(parMois.indexOf(moisMax)))) : '')}
+    ${k(we, 'jours de week-end', clic(() => ouvrirListe(`Chronos sur un week-end (${an})`, surWeekend)))}
+    ${k(tailleMoy ? tailleMoy.toFixed(1).replace('.', ',') : '—', 'chronométreurs par chrono', clic(() => ouvrirListe(`Chronos avec 3 chronométreurs ou plus`, evs.filter(e => (e.nb_chrono || 0) >= 3))))}
   </div>`);
 
   // 3. À relancer / à signer --------------------------------------------
-  const relance = base.filter(e => ['Option', 'Validé non signé'].includes(e.statut) &&
-                                   (dayOf(e.end) || dayOf(e.start)) >= TODAY)
+  const relance = base.filter(e => ['Option', 'Validé non signé'].includes(e.statut) && delaiFin(e) >= TODAY)
                       .sort((a, b) => a.start.localeCompare(b.start));
   if (relance.length) {
     parts.push(panel(`À relancer ou à faire signer (${relance.length})`,
       relance.slice(0, 6).map(e => ligneMini(e)).join('') +
-      (relance.length > 6 ? `<div class="note">+ ${relance.length - 6} autres (voir l'onglet Liste)</div>` : '')));
+      (relance.length > 6 ? `<div class="voirtout" ${clic(() => ouvrirListe('À relancer ou à faire signer', relance))}>Voir les ${relance.length} chronos ›</div>` : '')));
   }
 
   // 4. Alertes planning -----------------------------------------------
   const alertes = [];
   const cf = conflits();
   if (cf.length) {
-    const lignes = cf.slice(0, 5).map(x => `<div class="al">⚠ <b>${esc(x.nom)}</b> · ${dateLongue(x.d)} : ${[...x.evs].map(e => esc(e.title)).join(' + ')}</div>`).join('');
-    alertes.push(`<h4>Chronométreur sur 2 chronos le même jour (${cf.length})</h4>${lignes}${cf.length > 5 ? `<div class="note">+ ${cf.length - 5} autres</div>` : ''}`);
+    const lignes = cf.slice(0, 5).map(x => `<div class="al" ${clic(() => ouvrirListe(`${x.nom} · ${dateLongue(x.d)}`, [...x.evs]))}>⚠ <b>${esc(x.nom)}</b> · ${dateLongue(x.d)} : ${[...x.evs].map(e => esc(e.title)).join(' + ')}</div>`).join('');
+    alertes.push(`<h4>Chronométreur sur 2 chronos le même jour (${cf.length})</h4>${lignes}` +
+      (cf.length > 5 ? `<div class="voirtout" ${clic(() => ouvrirListe('Doubles affectations', [...new Set(cf.flatMap(x => [...x.evs]))]))}>Voir les ${cf.length} cas ›</div>` : ''));
   }
-  const sansEquipe = evs.filter(e => !e.nb_chrono && (!courante || (dayOf(e.end) || dayOf(e.start)) >= TODAY) &&
+  const sansEquipe = evs.filter(e => !e.nb_chrono && (!courante || delaiFin(e) >= TODAY) &&
                                     ['Validé', 'Validé non signé'].includes(e.statut));
   if (sansEquipe.length) {
     alertes.push(`<h4>Validés sans chronométreur (${sansEquipe.length})</h4>` +
-      sansEquipe.slice(0, 5).map(e => `<div class="al">⚠ ${dateLongue(dayOf(e.start))} · ${esc(e.title)}</div>`).join(''));
+      sansEquipe.slice(0, 5).map(e => {
+        const libres = disponibilites(clesDe(e), e).libres;
+        return `<div class="al" ${clic(() => detail(e))}>⚠ ${dateLongue(dayOf(e.start))} · ${esc(e.title)}${libres.length ? `<small>libres : ${esc(libres.map(prenom).join(', '))}</small>` : ''}</div>`;
+      }).join('') +
+      (sansEquipe.length > 5 ? `<div class="voirtout" ${clic(() => ouvrirListe('Validés sans chronométreur', sansEquipe))}>Voir les ${sansEquipe.length} chronos ›</div>` : ''));
   }
   const dense = Object.values(parJour).filter(x => x.n >= 3 && (!courante || x.d >= TODAY)).sort((a, b) => a.d - b.d);
   if (dense.length) {
     alertes.push(`<h4>Jours avec 3 chronos ou plus (${dense.length})</h4>` +
-      dense.slice(0, 4).map(x => `<div class="al">📍 ${dateLongue(x.d)} : ${x.n} chronos en parallèle</div>`).join(''));
+      dense.slice(0, 4).map(x => `<div class="al" ${clic(() => ouvrirJour(cleJour(x.d)))}>📍 ${dateLongue(x.d)} : ${x.n} chronos en parallèle</div>`).join(''));
+  }
+  const cm = conflitsMateriel(evs, courante);
+  if (cm.length) {
+    alertes.push(`<h4>Même matériel sur 2 chronos en même temps (${cm.length}) <small>à vérifier selon ton stock</small></h4>` +
+      cm.slice(0, 4).map(x => `<div class="al" ${clic(() => ouvrirListe(`${x.mat} · ${dateLongue(x.d)}`, [...x.evs]))}>📦 <b>${esc(x.mat)}</b> · ${dateLongue(x.d)} : ${[...x.evs].map(e => esc(e.title)).join(' + ')}</div>`).join(''));
   }
   if (alertes.length) parts.push(panel('Alertes planning', alertes.join('')));
-  else parts.push(panel('Alertes planning', '<div class="note ok">✓ Rien à signaler : pas de doublon, pas de chrono validé sans équipe.</div>'));
+  else parts.push(panel('Alertes planning', '<div class="note ok">✓ Rien à signaler : pas de doublon, pas de chrono validé sans équipe, pas de matériel en double.</div>'));
 
-  // 5. Calendrier de charge + année après année ------------------------
+  // 5. À préparer dans les 30 jours -----------------------------------
+  if (courante) {
+    const horizon = new Date(TODAY.getTime() + 30 * 864e5);
+    const prep = evs.filter(e => delaiFin(e) >= TODAY && dayOf(e.start) <= horizon);
+    if (prep.length) {
+      const bloc = (titre, cls, get) => {
+        const arr = compter(prep, get);
+        return arr.length ? `<h4>${titre}</h4><div class="chips-row">` + arr.map(x =>
+          `<span class="tag ${cls}" ${clic(() => ouvrirListe(`${x.l} · 30 prochains jours`, prep.filter(e => (get(e) || []).includes(x.l))))}>${esc(x.l)} <b>×${x.n}</b></span>`).join('') + '</div>' : '';
+      };
+      parts.push(panel(`À préparer · 30 prochains jours`,
+        `<div class="voirtout" style="margin-top:0" ${clic(() => ouvrirListe('Chronos des 30 prochains jours', prep))}>${pluriel(prep.length, 'chrono')} à venir ›</div>` +
+        bloc('Matériel', 't-mat', e => e.materiel) +
+        bloc('Technologies', 't-techno', e => e.techno) +
+        bloc('Tâches', 't-tache', e => (e.tags || []).filter(t => t !== 'Chrono')) +
+        (!prep.some(e => (e.materiel || []).length || (e.techno || []).length) ? '<div class="note">Matériel et technologies pas encore renseignés dans Notion pour ces chronos.</div>' : ''),
+        '<span>Touche une étiquette pour voir les chronos concernés</span>'));
+    }
+  }
+
+  // 6. Calendrier de charge + année après année ------------------------
   parts.push(htmlHeat(evs, an));
   parts.push(htmlComparatif());
 
-  // 6. Pipeline ------------------------------------------------------
+  // 7. Pipeline ------------------------------------------------------
   const nbSt = {};
   base.forEach(e => { const s = e.statut || '—'; nbSt[s] = (nbSt[s] || 0) + 1; });
-  // Perdus / annulés dont la date a été effacée : rattachés à l'année de création de la fiche
+  // Perdus / annulés dont la date a été effacée : rattachés à l'année de l'événement (ou de création)
   const sd = DASH_SCOPE === 'all' ? (PERDUS_LIST || []).filter(e => e.an === an) : [];
   sd.forEach(e => { nbSt[e.statut] = (nbSt[e.statut] || 0) + 1; });
   const stOrdre = Object.keys(nbSt).sort(ordreStatut);
@@ -1410,14 +1567,20 @@ function htmlStats() {
   const concl = (nbSt['Validé'] || 0) + (nbSt['Validé non signé'] || 0);
   const perdu = (nbSt['Perdu'] || 0) + (nbSt['Annulé'] || 0);
   const taux = concl + perdu ? Math.round(concl / (concl + perdu) * 100) : null;
+  const duStatut = s => [
+    ...base.filter(e => (e.statut || '—') === s),
+    ...sd.filter(e => e.statut === s).map(e => ({ sansDate: true, title: e.title, statut: e.statut, url: e.url, start: e.date || '' })),
+  ];
+  const actSt = s => clic(() => ouvrirListe(`${lblStatut(s)} · ${an}`, duStatut(s)));
   parts.push(panel(`Pipeline ${an}`,
-    `<div class="stack">${stOrdre.map(s => `<i class="st-${stSlug(s)}" style="width:${(nbSt[s] / tot * 100).toFixed(1)}%" title="${esc(lblStatut(s))} : ${nbSt[s]}"></i>`).join('')}</div>
-     <div class="stlist">${stOrdre.map(s => `<span class="st-${stSlug(s)}"><i></i>${esc(lblStatut(s))} <b>${nbSt[s]}</b></span>`).join('')}</div>` +
+    `<div class="stack">${stOrdre.map(s => `<i class="st-${stSlug(s)}" style="width:${(nbSt[s] / tot * 100).toFixed(1)}%" title="${esc(lblStatut(s))} : ${nbSt[s]}" ${actSt(s)}></i>`).join('')}</div>
+     <div class="stlist">${stOrdre.map(s => `<span class="st-${stSlug(s)}" ${actSt(s)}><i></i>${esc(lblStatut(s))} <b>${nbSt[s]}</b></span>`).join('')}</div>` +
     (taux !== null ? `<div class="delta">Taux de conclusion : <b>${taux} %</b> <span>(${concl} concrétisés contre ${perdu} perdus ou annulés, options en attente non comptées)</span></div>` : '') +
     (sd.length ? `<div class="note">${sd.length} fiches sans date (perdues, annulées, reportées…) sont rattachées à l'année de l'événement${
-      sd.some(e => e.source === 'creation') ? ` (retrouvée via la synchro Google Agenda ; pour ${sd.filter(e => e.source === 'creation').length} d'entre elles, année de création de la fiche à défaut)` : ' (retrouvée via la synchro Google Agenda)'}.</div>` : '')));
+      sd.some(e => e.source === 'creation') ? ` (retrouvée via la synchro Google Agenda ; pour ${sd.filter(e => e.source === 'creation').length} d'entre elles, année de création de la fiche à défaut)` : ' (retrouvée via la synchro Google Agenda)'}.</div>` : ''),
+    '<span>Touche un statut pour voir les chronos</span>'));
 
-  // 7. Équipe -------------------------------------------------------
+  // 8. Équipe -------------------------------------------------------
   // Équipe : toujours TOUS les chronos (statuts cochés), quel que soit « Tous / Mes chronos »
   const tous = DASH.filter(e => DASH_ST[e.statut || '—'] !== false);
   const eq = compter(tous, e => e.chronometreurs);
@@ -1427,56 +1590,69 @@ function htmlStats() {
   tous.forEach(e => {
     const ns = [...new Set(e.chronometreurs || [])].sort();
     for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) {
-      const c = ns[i].split(' ')[0] + ' + ' + ns[j].split(' ')[0]; paires[c] = (paires[c] || 0) + 1;
+      const c = ns[i] + ' + ' + ns[j]; (paires[c] = paires[c] || []).push(e);
     }
   });
-  const topPaires = Object.entries(paires).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([l, n]) => ({ l, n, cls: 'h-moi' }));
+  const topPaires = Object.entries(paires).sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(([l, liste]) => ({
+    l: l.split(' + ').map(prenom).join(' + '), n: liste.length, cls: 'h-moi',
+    act: clic(() => ouvrirListe(l, liste)),
+  }));
+  const taille = n => tous.filter(e => n === 3 ? (e.nb_chrono || 0) >= 3 : (e.nb_chrono || 0) === n);
   const mesChronos = DASH.filter(e => e.mine && DASH_ST[e.statut || '—'] !== false);
   if (mesChronos.length) {
     const avec = compter(mesChronos, e => e.autres || []);
-    const seuls = mesChronos.filter(e => !(e.autres || []).length).length;
+    const seuls = mesChronos.filter(e => !(e.autres || []).length);
     parts.push(panel(`Avec qui je fais équipe (${mesChronos.length} chronos)`,
-      hbars(avec.slice(0, 10).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j ensemble` })), 'h-moi', true) +
-      `<div class="chips-row"><span class="tag">seul sur <b>${seuls}</b></span>` +
-      `<span class="tag">en équipe sur <b>${mesChronos.length - seuls}</b></span></div>`,
-      '<span>Chronos où tu es affecté, selon les statuts cochés</span>'));
+      hbars(avec.slice(0, 10).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j ensemble`, act: clic(() => ouvrirListe(`Avec ${x.l}`, mesChronos.filter(e => (e.autres || []).includes(x.l)))) })), 'h-moi', true) +
+      `<div class="chips-row"><span class="tag" ${clic(() => ouvrirListe('Chronos où je suis seul', seuls))}>seul sur <b>${seuls.length}</b></span>` +
+      `<span class="tag" ${clic(() => ouvrirListe('Chronos en équipe', mesChronos.filter(e => (e.autres || []).length)))}>en équipe sur <b>${mesChronos.length - seuls.length}</b></span></div>`,
+      '<span>Chronos où tu es affecté, selon les statuts cochés · touche une ligne</span>'));
   }
 
   parts.push(panel('Équipe : qui chronomètre quoi',
-    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l === monNom() ? 'h-moi' : 'h-autres' })), '', true) +
+    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l === monNom() ? 'h-moi' : 'h-autres',
+      act: clic(() => ouvrirListe(x.l, tous.filter(e => (e.chronometreurs || []).includes(x.l)))) })), '', true) +
     `<div class="chips-row">
-      <span class="tag">seul <b>${tailles[1]}</b></span><span class="tag">à 2 <b>${tailles[2]}</b></span>
-      <span class="tag">à 3 et + <b>${tailles[3]}</b></span><span class="tag t-warn">non affecté <b>${tailles[0]}</b></span></div>` +
+      <span class="tag" ${clic(() => ouvrirListe('Chronos à un seul chronométreur', taille(1)))}>seul <b>${tailles[1]}</b></span>
+      <span class="tag" ${clic(() => ouvrirListe('Chronos à 2 chronométreurs', taille(2)))}>à 2 <b>${tailles[2]}</b></span>
+      <span class="tag" ${clic(() => ouvrirListe('Chronos à 3 chronométreurs ou plus', taille(3)))}>à 3 et + <b>${tailles[3]}</b></span>
+      <span class="tag t-warn" ${clic(() => ouvrirListe('Chronos non affectés', taille(0)))}>non affecté <b>${tailles[0]}</b></span></div>` +
     (topPaires.length ? `<h4>Binômes les plus fréquents</h4>${hbars(topPaires, '', true)}` : ''),
-    `<span>Nombre de chronos · jours de présence cumulés · tous les chronos de l'équipe (${tous.length}), statuts cochés</span>`));
+    `<span>Nombre de chronos · jours de présence cumulés · tous les chronos de l'équipe (${tous.length}), statuts cochés · touche une ligne</span>`));
+  const mat = htmlMatrice(tous, an);
+  if (mat) parts.push(mat);
 
-  // 8. Rythme & records -------------------------------------------------
+  // 9. Rythme & records -------------------------------------------------
   const semaines = {};
   evs.forEach(e => {
     const d = dayOf(e.start); if (!d || d.getFullYear() !== an) return;
     const l = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7);
-    const c = cleJour(l); semaines[c] = semaines[c] || { l, n: 0 }; semaines[c].n++;
+    const c = cleJour(l); semaines[c] = semaines[c] || { l, n: 0, evs: [] }; semaines[c].n++; semaines[c].evs.push(e);
   });
   const sMax = Object.values(semaines).sort((a, b) => b.n - a.n)[0];
   const jMax = Object.values(parJour).sort((a, b) => b.n - a.n || a.d - b.d)[0];
+  const plusLong = [...evs].sort((a, b) => nbJours(b) - nbJours(a))[0];
   let pause = { n: 0 }, run = 0, debut = null;
   for (let d = new Date(an, 0, 1); d.getFullYear() === an; d = new Date(an, d.getMonth(), d.getDate() + 1)) {
     if (parJour[cleJour(d)]) { run = 0; debut = null; }
     else { if (!run) debut = new Date(d); run++; if (run > pause.n) pause = { n: run, de: debut, a: new Date(d) }; }
   }
-  const rec = (i, t, v) => `<div class="rec"><span>${i} ${t}</span><b>${v}</b></div>`;
+  const rec = (i, t, v, act = '') => `<div class="rec" ${act}><span>${i} ${t}</span><b>${v}</b></div>`;
+  const duJourSem = idx => evs.filter(e => { let ok = false; chaqueJour(e, d => { if (d.getFullYear() === an && (d.getDay() + 6) % 7 === idx) ok = true; }); return ok; });
   parts.push(panel('Rythme et records',
-    hbars(parDow.map((n, i) => ({ l: DOW[i], n, cls: i >= 5 ? 'h-moi' : 'h-autres' }))) +
+    hbars(parDow.map((n, i) => ({ l: DOW[i], n, cls: i >= 5 ? 'h-moi' : 'h-autres', act: clic(() => ouvrirListe(`Chronos le ${DOW[i].toLowerCase()} (${an})`, duJourSem(i))) }))) +
     '<div class="recs">' +
-    (jMax ? rec('🔥', 'Jour le plus chargé', `${dateLongue(jMax.d)} · ${pluriel(jMax.n, 'chrono')}`) : '') +
-    (sMax ? rec('📅', 'Semaine record', `du ${dateLongue(sMax.l)} · ${pluriel(sMax.n, 'chrono')}`) : '') +
-    (pause.n > 1 ? rec('🌴', 'Plus longue pause', `${pluriel(pause.n, 'jour')} (${dateLongue(pause.de)} → ${dateLongue(pause.a)})`) : '') +
-    '</div>', '<span>Jours couverts par un chrono, par jour de semaine (week-end en orange)</span>'));
+    (jMax ? rec('🔥', 'Jour le plus chargé', `${dateLongue(jMax.d)} · ${pluriel(jMax.n, 'chrono')}`, clic(() => ouvrirJour(cleJour(jMax.d)))) : '') +
+    (sMax ? rec('📅', 'Semaine record', `du ${dateLongue(sMax.l)} · ${pluriel(sMax.n, 'chrono')}`, clic(() => ouvrirListe(`Semaine du ${dateLongue(sMax.l)}`, sMax.evs))) : '') +
+    (plusLong && nbJours(plusLong) > 1 ? rec('🏁', 'Plus long chrono', `${esc(plusLong.title)} · ${nbJours(plusLong)} j`, clic(() => detail(plusLong))) : '') +
+    (pause.n > 1 ? rec('🌴', 'Plus longue pause', `${pluriel(pause.n, 'jour')} (${dateLongue(pause.de)} → ${dateLongue(pause.a)})`, clic(() => ouvrirJour(cleJour(pause.de)))) : '') +
+    '</div>', '<span>Jours couverts par un chrono, par jour de semaine (week-end en orange) · touche une ligne</span>'));
 
-  // 9. Répartitions --------------------------------------------------
+  // 10. Répartitions --------------------------------------------------
   const rep = (titre, get, cls) => {
     const r = compter(evs, get).slice(0, 8);
-    return r.length ? panel(titre, hbars(r.map(x => ({ l: x.l, n: x.n, sub: `${x.j} j` })), cls)) : '';
+    return r.length ? panel(titre, hbars(r.map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`,
+      act: clic(() => ouvrirListe(`${x.l} · ${an}`, evs.filter(e => (get(e) || []).includes(x.l)))) })), cls)) : '';
   };
   parts.push(rep('Par type de chrono', e => e.type, 'h-type'));
   parts.push(rep('Par technologie', e => e.techno, 'h-techno'));
@@ -1528,48 +1704,146 @@ async function chargerAnnees() {
   if (VIEW === 'dash' && DASH_SUB === 'stats') { const y = window.scrollY; rendre(); window.scrollTo(0, y); }
 }
 
-/* ─── Détail ─── */
+/* ─── Fenêtres (fiche d'un chrono, listes, jour) ─── */
 
+let FEN_PILE = [];          // historique : chaque entrée sait se redessiner (pour « ← Retour »)
+let FEN_EL = null;
+
+function fermerFen() {
+  FEN_PILE = [];
+  if (FEN_EL) { FEN_EL.remove(); FEN_EL = null; }
+  document.removeEventListener('keydown', surEchapFen);
+}
+function surEchapFen(e) {
+  if (e.key !== 'Escape') return;
+  if (FEN_PILE.length > 1) { FEN_PILE.pop(); afficherFen(); } else fermerFen();
+}
+
+/** Empile une fenêtre : rendu() renvoie { html, grand, lier(box) }. */
+function fenetre(rendu) {
+  FEN_PILE.push(rendu);
+  afficherFen();
+}
+function afficherFen() {
+  const r = FEN_PILE[FEN_PILE.length - 1];
+  if (!r) { fermerFen(); return; }
+  const v = r();
+  if (!FEN_EL || !FEN_EL.isConnected) {
+    FEN_EL = document.createElement('div');
+    FEN_EL.className = 'sheet';
+    FEN_EL.setAttribute('role', 'dialog');
+    FEN_EL.setAttribute('aria-modal', 'true');
+    FEN_EL.onclick = e => { if (e.target === FEN_EL) fermerFen(); };
+    document.addEventListener('keydown', surEchapFen);
+    document.body.appendChild(FEN_EL);
+  }
+  FEN_EL.innerHTML = `<div class="sheet-box${v.grand ? ' grand' : ''}">
+    ${FEN_PILE.length > 1 ? '<button type="button" class="sheet-back">← Retour</button>' : ''}
+    ${v.html}
+    <button type="button" class="sheet-close">Fermer</button></div>`;
+  const box = FEN_EL.firstElementChild;
+  box.querySelector('.sheet-close').onclick = fermerFen;
+  const back = box.querySelector('.sheet-back');
+  if (back) back.onclick = () => { FEN_PILE.pop(); afficherFen(); };
+  if (v.lier) v.lier(box);
+}
+
+/** Ligne d'une liste : touche = fiche. */
+function ligneListe(ev, i) {
+  const d = dayOf(ev.start);
+  const date = d ? `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 4)}.${d.getFullYear() !== TODAY.getFullYear() ? ' ' + d.getFullYear() : ''}` : 'sans date';
+  const fin = dayOf(ev.end);
+  const duree = d && fin && fin > d ? ` → ${fin.getDate()} ${MONTHS[fin.getMonth()].slice(0, 4)}.` : '';
+  const equipe = ev.sansDate ? '' : ' · ' + equipeTxt(ev);
+  return `<div class="mini st-${stSlug(ev.statut)}" data-w="${i}" role="button" tabindex="0">
+    <span class="jx">${date}</span>
+    <span class="mt">${esc(ev.title)}<small>${esc(ev.statut || 'sans statut')}${duree}${equipe}</small></span></div>`;
+}
+
+/** Fenêtre « liste de chronos » : titre, compteurs, lignes cliquables. */
+function ouvrirListe(titre, evs, extra = '') {
+  const liste = [...new Map(evs.map(e => [e.url || e.title + e.start, e])).values()]
+    .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  fenetre(() => {
+    const jours = liste.reduce((s, e) => s + (e.sansDate ? 0 : nbJours(e)), 0);
+    return {
+      grand: true,
+      html: `<h3>${esc(titre)}</h3>
+        <div class="sous">${pluriel(liste.length, 'chrono')}${jours ? ' · ' + pluriel(jours, 'jour') : ''}</div>
+        ${extra}
+        <div class="defile">${liste.length ? liste.map(ligneListe).join('') : '<div class="note">Aucun chrono.</div>'}</div>`,
+      lier(box) {
+        box.querySelectorAll('[data-w]').forEach(el => {
+          const go = () => detail(liste[+el.dataset.w]);
+          el.onclick = go;
+          el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+        });
+      },
+    };
+  });
+}
+
+/** Fiche d'un chrono. */
 function detail(ev) {
   if (!ev) return;
+  fenetre(() => {
+    const d = dayOf(ev.start);
+    const fin = dayOf(ev.end);
+    const meta = [
+      ev.source ? LBL[ev.source] : '',
+      d ? `${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${fin && fin > d ? ` → ${DOW_S[fin.getDay()]} ${fin.getDate()} ${MONTHS[fin.getMonth()]}` : ''}` : 'date effacée',
+      d && fin && fin > d ? pluriel(nbJours(ev), 'jour') : '',
+      heure(ev),
+      ev.lieu ? '📍 ' + esc(ev.lieu) : '',
+      ev.statut ? esc(ev.statut) : '',
+      ev.chronometreurs ? (ev.chronometreurs.length ? '👤 ' + esc(ev.chronometreurs.join(', ')) : '⚠ non affecté') : '',
+    ].filter(Boolean).map(x => `<span>${x}</span>`).join('');
 
-  const d = dayOf(ev.start);
-  const meta = [
-    LBL[ev.source],
-    `${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`,
-    heure(ev),
-    ev.lieu ? '📍 ' + esc(ev.lieu) : '',
-    ev.statut ? esc(ev.statut) : '',
-    ev.chronometreurs ? (ev.chronometreurs.length ? '👤 ' + esc(ev.chronometreurs.join(', ')) : '⚠ non affecté') : '',
-  ].filter(Boolean).map(x => `<span>${x}</span>`).join('');
-
-  const sheet = document.createElement('div');
-  sheet.className = 'sheet';
-  sheet.innerHTML = `
-    <div class="sheet-box">
-      <h3>${esc(ev.title)}</h3>
-      <div class="ev-meta">${meta}</div>
-      ${equipeLigne(ev)}
-      ${chipsEv(ev) ? `<div class="ev-tags" style="margin-bottom:6px">${chipsEv(ev)}</div>` : ''}
-      ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
-      <button type="button" class="sheet-close">Fermer</button>
-    </div>`;
-
-  // Une seule fiche à la fois ; on ferme en touchant le fond, « Fermer » ou la touche Échap
-  document.querySelectorAll('.sheet').forEach(x => x.remove());
-  const fermer = () => { sheet.remove(); document.removeEventListener('keydown', surEchap); };
-  const surEchap = e => { if (e.key === 'Escape') fermer(); };
-  sheet.setAttribute('role', 'dialog');
-  sheet.setAttribute('aria-modal', 'true');
-  sheet.onclick = e => { if (e.target === sheet) fermer(); };
-  sheet.querySelector('.sheet-close').onclick = fermer;
-  document.addEventListener('keydown', surEchap);
-  document.body.appendChild(sheet);
+    let dispo = '';
+    if (ev.source === 'notion' && d && !ev.sansDate && !(ev.chronometreurs || []).length &&
+        !['Annulé', 'Perdu', 'Reporté'].includes(ev.statut)) {
+      const dp = disponibilites(clesDe(ev), ev);
+      dispo = `<div class="dispo"><b>Libres ces jours-là</b> ${dp.libres.length ? esc(dp.libres.join(', ')) : 'personne'}` +
+        (dp.pris.length ? `<small>Déjà sur un chrono : ${esc(dp.pris.map(x => x.n).join(', '))}</small>` : '') + '</div>';
+    }
+    const jourBtn = d && !ev.sansDate ? `<button type="button" class="mini-btn" data-jour="${cleJour(d)}">📅 Voir ce jour</button>` : '';
+    const eq = (ev.chronometreurs || []).map(n =>
+      `<button type="button" class="mini-btn" data-pers="${esc(n)}">👤 ${esc(prenom(n))}</button>`).join('');
+    return {
+      html: `<h3>${esc(ev.title)}</h3>
+        <div class="ev-meta">${meta}</div>
+        ${equipeLigne(ev)}
+        ${chipsEv(ev) ? `<div class="ev-tags" style="margin-bottom:6px">${chipsEv(ev)}</div>` : ''}
+        ${dispo}
+        <div class="chips-row">${jourBtn}${eq}</div>
+        ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Ouvrir dans Notion</a>` : ''}`,
+      lier(box) {
+        box.querySelectorAll('[data-jour]').forEach(b => b.onclick = () => ouvrirJour(b.dataset.jour));
+        box.querySelectorAll('[data-pers]').forEach(b => b.onclick = () => {
+          const n = b.dataset.pers;
+          ouvrirListe(n, toutesFiches().filter(e => e.source === 'notion' && (e.chronometreurs || []).includes(n) &&
+            dayOf(e.start) && dayOf(e.start).getFullYear() === (d ? d.getFullYear() : DASH_YEAR)));
+        });
+      },
+    };
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
 //  Interactions
 // ══════════════════════════════════════════════════════════════════
+
+/** Tous les éléments `data-a` (stats, barres, cases…) : un seul écouteur, clavier compris. */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]');
+  if (el && ACTIONS[+el.dataset.a]) ACTIONS[+el.dataset.a]();
+  else { const j = e.target.closest('[data-j]'); if (j) ouvrirJour(j.dataset.j); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest && e.target.closest('[data-a]');
+  if (el && ACTIONS[+el.dataset.a]) { e.preventDefault(); ACTIONS[+el.dataset.a](); }
+});
 
 function ouvrir(code) {
   CODE = code;

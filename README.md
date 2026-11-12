@@ -157,3 +157,8 @@ qu'un petit « chargeur » qui télécharge `widget.js` à chaque lancement (et 
 dernière copie hors ligne) : **modifier `widget.js` met à jour tous les widgets**, sans
 rien recoller. `widget.js` doit rester identique à `/home/claude/oxybol-chronos-widget.js`
 (copie de travail).
+
+
+## Tout est cliquable
+
+Dans l'onglet Stats : chaque chiffre, barre, case du calendrier de charge, statut, personne ou record ouvre la liste des chronos concernés ; toucher un chrono ouvre sa fiche (avec « Retour »), qui montre aussi qui est libre ces jours-là. Nouveaux panneaux : à préparer (30 jours), charge par personne et par mois, matériel demandé en double.
