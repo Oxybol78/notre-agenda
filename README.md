@@ -148,3 +148,12 @@ entrée dans `EQUIPE` (avec l'identifiant Notion de la personne), pousser.
 - Notion limite le débit : l'API réessaie sur 429 et l'app charge les autres
   années deux par deux.
 - Tests : `python3 -m unittest discover -s tests -v` (aucun accès réseau).
+
+### Widget iPhone hébergé
+
+`widget.js` est le script du widget ; `widget.html` est la page d'installation
+(`/widget.html?code=…` pré-remplit le code de la personne). Sur l'iPhone, on ne colle
+qu'un petit « chargeur » qui télécharge `widget.js` à chaque lancement (et garde la
+dernière copie hors ligne) : **modifier `widget.js` met à jour tous les widgets**, sans
+rien recoller. `widget.js` doit rester identique à `/home/claude/oxybol-chronos-widget.js`
+(copie de travail).

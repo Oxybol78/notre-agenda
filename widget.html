@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="referrer" content="no-referrer" />
+<meta name="robots" content="noindex" />
+<title>Widget Oxybol chronos</title>
+<style>
+  :root { --bg:#0f1117; --card:#1a1d27; --card2:#21253a; --border:#2d3148; --text:#e2e8f0; --muted:#8892a4; --chrono:#f97316; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text);
+         padding: 22px 16px 40px; max-width: 520px; margin: 0 auto; line-height: 1.45; }
+  h1 { font-size: 1.25rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .85rem; margin-bottom: 20px; }
+  ol { list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  li { counter-increment: s; background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+       padding: 14px 14px 14px 52px; position: relative; font-size: .92rem; }
+  li::before { content: counter(s); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 50%;
+               background: var(--chrono); color: #000; font-weight: 800; display: grid; place-items: center; font-size: .85rem; }
+  li b { display: block; margin-bottom: 3px; }
+  li span { color: var(--muted); font-size: .82rem; }
+  a.btn, button.btn { display: block; width: 100%; margin-top: 10px; text-align: center; text-decoration: none;
+       background: var(--chrono); color: #000; border: 0; border-radius: 10px; padding: 12px; font-size: .95rem; font-weight: 800; font-family: inherit; }
+  a.btn.sec { background: var(--card2); color: var(--text); border: 1px solid var(--border); font-weight: 600; }
+  .ok { color: #22c55e; font-size: .82rem; margin-top: 8px; min-height: 1.2em; text-align: center; }
+  details { margin-top: 18px; color: var(--muted); font-size: .8rem; }
+  textarea { width: 100%; height: 150px; margin-top: 8px; background: var(--card); color: var(--text); border: 1px solid var(--border);
+             border-radius: 8px; padding: 8px; font-size: .72rem; font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<h1>⏱ Widget « Mes chronos »</h1>
+<p class="sub">À installer une seule fois sur ton iPhone (3 minutes). Les mises à jour suivantes sont automatiques.</p>
+
+<ol>
+  <li><b>Installe l'app Scriptable</b><span>Gratuite, sur l'App Store.</span>
+    <a class="btn sec" href="https://apps.apple.com/app/scriptable/id1405459188">Ouvrir l'App Store</a></li>
+  <li><b>Copie le script</b><span>Un seul bouton, rien à taper.</span>
+    <button class="btn" id="copier" type="button">Copier le script</button>
+    <div class="ok" id="ok"></div></li>
+  <li><b>Colle-le dans Scriptable</b><span>Ouvre Scriptable, touche <b style="display:inline">+</b> en haut à droite, appuie dans la page blanche et choisis « Coller ». Renomme le script « Oxybol chronos » (touche son titre en haut), puis touche ▶ pour le lancer une fois.</span></li>
+  <li><b>Ajoute le widget</b><span>Écran d'accueil : appui long sur un fond libre → <b style="display:inline">+</b> → Scriptable → choisis une taille → « Ajouter ». Touche le widget → Script : « Oxybol chronos ».</span></li>
+</ol>
+
+<details>
+  <summary>Voir le script copié</summary>
+  <textarea id="src" readonly></textarea>
+</details>
+
+<script>
+  const BASE = location.origin;
+  const code = (new URLSearchParams(location.search).get('code') || '').trim();
+  // Le script collé sur l'iPhone est un « chargeur » : il télécharge à chaque lancement la dernière
+  // version du widget depuis ce site (et garde la dernière copie en cas de coupure réseau).
+  const chargeur = `// Oxybol chronos — chargeur : récupère toujours la dernière version du widget
+const BASE = ${JSON.stringify(BASE)};
+const CODE = ${JSON.stringify(code)};
+const fm = FileManager.local();
+const copie = fm.joinPath(fm.documentsDirectory(), "oxybol-widget-code.js");
+if (!Keychain.contains("oxybol_url")) Keychain.set("oxybol_url", BASE);
+if (CODE && !Keychain.contains("oxybol_code")) Keychain.set("oxybol_code", CODE);
+let src = null;
+try {
+  const r = new Request(BASE + "/widget.js?t=" + Date.now());
+  r.timeoutInterval = 15;
+  const t = await r.loadString();
+  if (t && t.length > 1000 && t.includes("Oxybol")) { src = t; fm.writeString(copie, t); }
+} catch (e) {}
+if (!src && fm.fileExists(copie)) src = fm.readString(copie);
+if (!src) throw new Error("Widget indisponible : vérifie ta connexion");
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+await new AsyncFunction(src)();
+`;
+  document.getElementById('src').value = chargeur;
+  document.getElementById('copier').onclick = async () => {
+    const ok = document.getElementById('ok');
+    try { await navigator.clipboard.writeText(chargeur); ok.textContent = '✓ Copié. Passe à l’étape 3.'; }
+    catch (e) {
+      const t = document.getElementById('src'); t.parentElement.open = true; t.select(); t.setSelectionRange(0, 99999);
+      ok.textContent = 'Texte sélectionné : touche « Copier » dans le menu qui apparaît.';
+    }
+  };
+</script>
+</body>
+</html>
