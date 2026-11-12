@@ -572,6 +572,7 @@ let DASH_ST     = {};            // { 'Validé': true, ... } — complété au f
 let DASH_YEAR   = new Date().getFullYear();
 let DASH_WHEN   = 'upcoming';    // année en cours : 'upcoming' (à venir) | 'all' (toute l'année)
 const DASH_CACHE = {};           // année -> événements déjà chargés
+const DASH_SD    = {};           // année -> perdus/annulés sans date (rattachés à l'année de création)
 const YEAR_MIN  = 2022;          // début des archives Oxybol dans Notion
 const YEAR_MAX  = new Date().getFullYear() + 4;
 let CUR_LIST    = EVENTS;        // liste dans laquelle le calendrier retrouve ses événements
@@ -713,6 +714,7 @@ async function chargerDash(silencieux = false, force = false) {
 
     // L'utilisateur a changé d'année pendant le chargement : on garde en cache, sans afficher
     DASH_CACHE[an] = d.events || [];
+    DASH_SD[an]    = d.sans_date || [];
     if (an !== DASH_YEAR) return;
 
     DASH = DASH_CACHE[an];
@@ -1359,15 +1361,19 @@ function htmlStats() {
   // 6. Pipeline ------------------------------------------------------
   const nbSt = {};
   base.forEach(e => { const s = e.statut || '—'; nbSt[s] = (nbSt[s] || 0) + 1; });
+  // Perdus / annulés dont la date a été effacée : rattachés à l'année de création de la fiche
+  const sd = DASH_SCOPE === 'all' ? (DASH_SD[an] || []) : [];
+  sd.forEach(e => { nbSt[e.statut] = (nbSt[e.statut] || 0) + 1; });
   const stOrdre = Object.keys(nbSt).sort(ordreStatut);
-  const tot = base.length || 1;
+  const tot = (base.length + sd.length) || 1;
   const concl = (nbSt['Validé'] || 0) + (nbSt['Validé non signé'] || 0);
   const perdu = (nbSt['Perdu'] || 0) + (nbSt['Annulé'] || 0);
   const taux = concl + perdu ? Math.round(concl / (concl + perdu) * 100) : null;
   parts.push(panel(`Pipeline ${an}`,
     `<div class="stack">${stOrdre.map(s => `<i class="st-${stSlug(s)}" style="width:${(nbSt[s] / tot * 100).toFixed(1)}%" title="${esc(lblStatut(s))} : ${nbSt[s]}"></i>`).join('')}</div>
      <div class="stlist">${stOrdre.map(s => `<span class="st-${stSlug(s)}"><i></i>${esc(lblStatut(s))} <b>${nbSt[s]}</b></span>`).join('')}</div>` +
-    (taux !== null ? `<div class="delta">Taux de conclusion : <b>${taux} %</b> <span>(${concl} concrétisés contre ${perdu} perdus ou annulés, options en attente non comptées)</span></div>` : '')));
+    (taux !== null ? `<div class="delta">Taux de conclusion : <b>${taux} %</b> <span>(${concl} concrétisés contre ${perdu} perdus ou annulés, options en attente non comptées)</span></div>` : '') +
+    (sd.length ? `<div class="note">${sd.length} fiches sans date (perdues, annulées, reportées…) sont rattachées à l'année où la demande a été créée dans Notion.</div>` : '')));
 
   // 7. Équipe -------------------------------------------------------
   const eq = compter(evs, e => e.chronometreurs);
@@ -1439,6 +1445,7 @@ async function chargerAnnees() {
       if (!r.ok) return;
       const d = await r.json();
       DASH_CACHE[y] = d.events || [];
+      DASH_SD[y]    = d.sans_date || [];
       DASH_CACHE[y].forEach(e => { const s = e.statut || '—'; if (!(s in DASH_ST)) DASH_ST[s] = STATUTS_DEFAUT.includes(s); });
     } catch {}
   }));

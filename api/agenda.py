@@ -78,8 +78,13 @@ class handler(BaseHTTPRequestHandler):
                 an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else date.today().year
                 events = _notion_chronos(an)
                 events.sort(key=lambda e: (e["start"], e["title"]))
+                try:
+                    sans_date = _notion_sans_date(an)
+                except Exception:
+                    sans_date = []   # bonus : ne doit jamais bloquer le tableau de bord
                 self._json({
                     "events":      events,
+                    "sans_date":   sans_date,
                     "errors":      [],
                     "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
                 })
@@ -179,6 +184,52 @@ def _notion_chronos(annee):
             {"property": "Tags", "multi_select": {"contains": "Chrono"}},
         ]
     })
+
+
+PERDUS = ("Perdu", "Annulé", "Reporté", "Déjà Client à relancer",
+          "Client relancé en attente de retour")
+
+
+def _notion_sans_date(annee):
+    """Chronos perdus / annulés / reportés : leur date est effacée dans Notion.
+    On les rattache à l'année de CRÉATION de la fiche (la demande du client)."""
+    token = os.environ.get("NOTION_TOKEN")
+    if not token:
+        return []
+    body = {
+        "filter": {"and": [
+            {"property": "Tags", "multi_select": {"contains": "Chrono"}},
+            {"property": "Date", "date": {"is_empty": True}},
+            {"timestamp": "created_time", "created_time": {"on_or_after": f"{annee}-01-01"}},
+            {"timestamp": "created_time", "created_time": {"before": f"{annee + 1}-01-01"}},
+            {"or": [{"property": "Statut", "select": {"equals": st}} for st in PERDUS]},
+        ]},
+        "page_size": 100,
+    }
+    headers = {
+        "Authorization":  f"Bearer {token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type":   "application/json",
+    }
+    out, cursor = [], None
+    while True:
+        if cursor:
+            body["start_cursor"] = cursor
+        data = _req(f"https://api.notion.com/v1/databases/{NOTION_DB_ID}/query",
+                    data=body, headers=headers, method="POST")
+        for page in data.get("results", []):
+            p = page.get("properties", {})
+            out.append({
+                "statut": (p.get("Statut", {}).get("select") or {}).get("name", ""),
+                "cree":   (page.get("created_time") or "")[:10],
+                "title":  "".join(b.get("plain_text", "")
+                                  for b in p.get("Evènement", {}).get("title", [])).strip(),
+                "url":    page.get("url", ""),
+            })
+        if not data.get("has_more"):
+            break
+        cursor = data.get("next_cursor")
+    return out
 
 
 def _notion_pages(filtre):
