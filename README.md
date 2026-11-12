@@ -36,7 +36,9 @@ Notion** (`/api/agenda?code=XXXX&mode=chronos`) :
 - histogramme mensuel (moi / autres chronométreurs), liste et calendrier
   colorés par statut
 
-Fenêtre : du 1er janvier de l'année en cours à +365 jours.
+Fenêtre : du 1er janvier de l'année en cours, sans limite dans le futur
+(les options à long terme restent visibles). Le chiffre « en 2026 » ne compte
+que l'année en cours.
 
 Les tokens ne sont **jamais** dans le code : uniquement dans les
 variables d'environnement Vercel.
