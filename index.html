@@ -432,6 +432,7 @@
   .hbars { display: grid; gap: 7px; }
   .hrow { display: grid; grid-template-columns: 100px 1fr auto; gap: 8px; align-items: center; font-size: .76rem; border-radius: 6px; }
   .hrow.sel { background: var(--card2); }
+  .hbars.wide .hrow { grid-template-columns: minmax(120px, 44%) 1fr auto; }
   .hl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ht { height: 9px; background: var(--card2); border-radius: 5px; overflow: hidden; display: block; }
   .ht i { display: block; height: 100%; border-radius: 5px; background: #4a5170; }
@@ -1166,10 +1167,10 @@ function compter(evs, get) {
   return Object.values(m).sort((a, b) => b.n - a.n || b.j - a.j || a.l.localeCompare(b.l));
 }
 
-function hbars(items, cls = '') {
+function hbars(items, cls = '', wide = false) {
   if (!items.length) return '<div class="note">Aucune donnée</div>';
   const max = Math.max(...items.map(i => i.n));
-  return '<div class="hbars">' + items.map(i => `
+  return `<div class="hbars${wide ? ' wide' : ''}">` + items.map(i => `
     <div class="hrow">
       <span class="hl" title="${esc(i.l)}">${esc(i.l)}</span>
       <span class="ht"><i class="${i.cls || cls}" style="width:${(i.n / max * 100).toFixed(1)}%"></i></span>
@@ -1388,12 +1389,23 @@ function htmlStats() {
     }
   });
   const topPaires = Object.entries(paires).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([l, n]) => ({ l, n, cls: 'h-moi' }));
+  const mesChronos = DASH.filter(e => e.mine && DASH_ST[e.statut || '—'] !== false);
+  if (mesChronos.length) {
+    const avec = compter(mesChronos, e => e.autres || []);
+    const seuls = mesChronos.filter(e => !(e.autres || []).length).length;
+    parts.push(panel(`Avec qui je fais équipe (${mesChronos.length} chronos)`,
+      hbars(avec.slice(0, 10).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j ensemble` })), 'h-moi', true) +
+      `<div class="chips-row"><span class="tag">seul sur <b>${seuls}</b></span>` +
+      `<span class="tag">en équipe sur <b>${mesChronos.length - seuls}</b></span></div>`,
+      '<span>Chronos où tu es affecté, selon les statuts cochés</span>'));
+  }
+
   parts.push(panel('Équipe : qui chronomètre quoi',
-    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l.toLowerCase().startsWith('christophe') ? 'h-moi' : 'h-autres' }))) +
+    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l.toLowerCase().startsWith('christophe') ? 'h-moi' : 'h-autres' })), '', true) +
     `<div class="chips-row">
       <span class="tag">seul <b>${tailles[1]}</b></span><span class="tag">à 2 <b>${tailles[2]}</b></span>
       <span class="tag">à 3 et + <b>${tailles[3]}</b></span><span class="tag t-warn">non affecté <b>${tailles[0]}</b></span></div>` +
-    (topPaires.length ? `<h4>Binômes les plus fréquents</h4>${hbars(topPaires)}` : ''),
+    (topPaires.length ? `<h4>Binômes les plus fréquents</h4>${hbars(topPaires, '', true)}` : ''),
     '<span>Nombre de chronos · jours de présence cumulés</span>'));
 
   // 8. Rythme & records -------------------------------------------------
