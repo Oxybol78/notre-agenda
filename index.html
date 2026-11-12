@@ -819,6 +819,7 @@ function htmlDash() {
   const mois  = TODAY.getMonth();
 
   // --- Indicateurs ---------------------------------------------------
+  const enAnnee = evs.filter(e => { const d = dayOf(e.start); return d && d.getFullYear() === an; });
   const aVenir  = evs.filter(e => { const d = dayOf(e.start); return d && d >= TODAY; });
   const ceMois  = evs.filter(e => { const d = dayOf(e.start); return d && d.getFullYear() === an && d.getMonth() === mois; });
   const aMoi    = aVenir.filter(e => e.mine);
@@ -834,7 +835,7 @@ function htmlDash() {
   const kpis = `<div class="kpis">
     ${kpi(aVenir.length, 'à venir')}
     ${kpi(ceMois.length, 'ce mois-ci')}
-    ${kpi(evs.length, `en ${an}`)}
+    ${kpi(enAnnee.length, `en ${an}`)}
     ${kpi(aMoi.length, 'à venir pour moi')}
     ${kpi(aAffecter.length, 'à affecter', aAffecter.length ? 'alert' : '')}
   </div>`;
