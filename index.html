@@ -1395,11 +1395,13 @@ function htmlStats() {
       sd.some(e => e.source === 'creation') ? ` (retrouvée via la synchro Google Agenda ; pour ${sd.filter(e => e.source === 'creation').length} d'entre elles, année de création de la fiche à défaut)` : ' (retrouvée via la synchro Google Agenda)'}.</div>` : '')));
 
   // 7. Équipe -------------------------------------------------------
-  const eq = compter(evs, e => e.chronometreurs);
+  // Équipe : toujours TOUS les chronos (statuts cochés), quel que soit « Tous / Mes chronos »
+  const tous = DASH.filter(e => DASH_ST[e.statut || '—'] !== false);
+  const eq = compter(tous, e => e.chronometreurs);
   const tailles = [0, 0, 0, 0];
-  evs.forEach(e => tailles[Math.min(e.nb_chrono || 0, 3)]++);
+  tous.forEach(e => tailles[Math.min(e.nb_chrono || 0, 3)]++);
   const paires = {};
-  evs.forEach(e => {
+  tous.forEach(e => {
     const ns = [...new Set(e.chronometreurs || [])].sort();
     for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) {
       const c = ns[i].split(' ')[0] + ' + ' + ns[j].split(' ')[0]; paires[c] = (paires[c] || 0) + 1;
@@ -1423,7 +1425,7 @@ function htmlStats() {
       <span class="tag">seul <b>${tailles[1]}</b></span><span class="tag">à 2 <b>${tailles[2]}</b></span>
       <span class="tag">à 3 et + <b>${tailles[3]}</b></span><span class="tag t-warn">non affecté <b>${tailles[0]}</b></span></div>` +
     (topPaires.length ? `<h4>Binômes les plus fréquents</h4>${hbars(topPaires, '', true)}` : ''),
-    `<span>Nombre de chronos · jours de présence cumulés · calculé sur ${DASH_SCOPE === 'all' ? 'tous les chronos' : 'tes chronos uniquement (bouton « Mes chronos »)'} et les statuts cochés</span>`));
+    `<span>Nombre de chronos · jours de présence cumulés · tous les chronos de l'équipe (${tous.length}), statuts cochés</span>`));
 
   // 8. Rythme & records -------------------------------------------------
   const semaines = {};
