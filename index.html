@@ -397,7 +397,7 @@
   }
   .bars {
     display: grid; grid-template-columns: repeat(12, 1fr);
-    gap: 4px; height: 120px; align-items: end;
+    gap: 4px; height: 140px; align-items: end;
   }
   .bar-col {
     display: flex; flex-direction: column; justify-content: flex-end;
@@ -414,7 +414,9 @@
   .bar .b-others { background: #4a5170; }
   .bar-lbl { font-size: .58rem; color: var(--muted); margin-top: 4px; text-align: center; }
   .bar-col.cur .bar-lbl { color: var(--accent); font-weight: 700; }
-  .legend { display: flex; gap: 12px; margin-top: 8px; font-size: .68rem; color: var(--muted); }
+  .bar-moi { font-size: .68rem; font-weight: 700; color: var(--chrono); margin-top: 2px; line-height: 1.1; }
+  .bar-moi:empty { display: none; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: .68rem; color: var(--muted); }
   .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 
   .badge {
@@ -900,6 +902,7 @@ function htmlDash() {
         <i class="b-mine"   style="height:${tot ? (m.moi    / tot * 100).toFixed(1) : 0}%"></i>
       </div>
       <div class="bar-lbl">${MONTHS[i].slice(0, 3)}.</div>
+      <div class="bar-moi" title="Mes chronos">${m.moi || '·'}</div>
     </div>`;
   }).join('');
 
@@ -907,8 +910,8 @@ function htmlDash() {
     <h3>Chronos par mois — ${an}</h3>
     <div class="bars">${colonnes}</div>
     <div class="legend">
-      <span><i style="background:var(--chrono)"></i>Moi</span>
-      <span><i style="background:#4a5170"></i>Autres chronométreurs</span>
+      <span><i style="background:var(--chrono)"></i>Moi (nombre en orange sous le mois)</span>
+      <span><i style="background:#4a5170"></i>Autres</span>
     </div>
   </div>`;
 
