@@ -7,8 +7,12 @@ Agrège deux sources en un seul flux :
 
 Accessible sur : /api/agenda?code=XXXX  (+ &mode=chronos pour le tableau de bord)
 
+Accès : un code par personne. ACCESS_CODE = Christophe (Notion + Google perso) ;
+CODE_ROMAIN, CODE_PAUL = les chronos Notion vus de leur côté (« mes chronos »,
+« avec qui je fais équipe »…), sans jamais l'agenda Google de Christophe.
+
 Variables d'environnement attendues (Vercel) :
-  ACCESS_CODE
+  ACCESS_CODE, CODE_ROMAIN, CODE_PAUL
   NOTION_TOKEN
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
 """
@@ -24,6 +28,28 @@ from datetime import date, datetime, timedelta, timezone
 
 NOTION_DB_ID  = "5d07a861-e0a1-4362-8a10-d4ce61acad0c"
 CHRISTOPHE_ID = "345ad871-6b2c-4534-b79a-889b6dabec3d"
+
+# Équipe : identifiant Notion de chaque personne (la clef donne le nom de la
+# variable Vercel : CODE_<CLEF>)
+EQUIPE = {
+    "ROMAIN": "5b3af71b-23af-49ef-b1d5-f2c46d651124",
+    "PAUL":   "3bd8fcdb-585d-43f0-94cd-6a1ee314bddd",
+}
+
+
+def _profil(fourni):
+    """Qui est-ce ? -> (nom, id Notion, accès Google) ou None si code inconnu."""
+    f = fourni.encode("utf-8")
+    trouve = None
+    attendu = os.environ.get("ACCESS_CODE", "")
+    # compare_digest : évite de révéler un code par le temps de réponse
+    if attendu and hmac.compare_digest(f, attendu.encode("utf-8")):
+        trouve = ("christophe", CHRISTOPHE_ID, True)
+    for clef, notion_id in EQUIPE.items():
+        code = os.environ.get(f"CODE_{clef}", "")
+        if code and hmac.compare_digest(f, code.encode("utf-8")) and not trouve:
+            trouve = (clef.lower(), notion_id, False)
+    return trouve
 
 # Fenêtre de temps affichée
 JOURS_PASSE  = 7
@@ -45,16 +71,16 @@ class handler(BaseHTTPRequestHandler):
         # --- Contrôle du code d'accès ---------------------------------
         params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         fourni = (params.get("code") or [""])[0]
-        attendu = os.environ.get("ACCESS_CODE", "")
 
-        # compare_digest : évite de révéler le code par le temps de réponse
-        if not attendu or not hmac.compare_digest(fourni, attendu):
+        profil = _profil(fourni)
+        if not profil:
             self._json({"error": "unauthorized", "events": []}, status=401)
             return
+        qui, uid, google = profil
 
         # --- Mode diagnostic : /api/agenda?code=XXXX&cals=1 -------------
         # Liste les agendas Google visibles, pour régler GOOGLE_CALENDARS.
-        if (params.get("cals") or [""])[0]:
+        if (params.get("cals") or [""])[0] and google:
             try:
                 token = _google_token()
                 data = _req(
@@ -76,10 +102,11 @@ class handler(BaseHTTPRequestHandler):
             try:
                 an = (params.get("year") or [""])[0]
                 an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else date.today().year
-                events = _notion_chronos(an)
+                events = _notion_chronos(an, uid)
                 events.sort(key=lambda e: (e["start"], e["title"]))
                 self._json({
                     "events":      events,
+                    "profil":      qui,
                     "errors":      [],
                     "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
                 })
@@ -100,10 +127,11 @@ class handler(BaseHTTPRequestHandler):
         events  = []
         erreurs = []
 
-        for nom, fonction in (
-            ("notion",  _notion),
-            ("google",  _google),
-        ):
+        sources = [("notion", lambda: _notion(uid))]
+        if google:                     # l'agenda Google perso reste à Christophe
+            sources.append(("google", _google))
+
+        for nom, fonction in sources:
             try:
                 events.extend(fonction())
             except Exception as e:
@@ -114,6 +142,7 @@ class handler(BaseHTTPRequestHandler):
 
         self._json({
             "events":      events,
+            "profil":      qui,
             "errors":      erreurs,
             "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
         })
@@ -161,20 +190,20 @@ def _bornes():
 #  Source 1 — Notion (les chronos)
 # ══════════════════════════════════════════════════════════════════════
 
-def _notion():
-    """Agenda partagé : uniquement les chronos où Christophe est affecté."""
+def _notion(uid=CHRISTOPHE_ID):
+    """Agenda partagé : uniquement les chronos où la personne est affectée."""
     debut, _ = _bornes()
     return _notion_pages({
         "and": [
-            {"property": "Chronométreur", "people": {"contains": CHRISTOPHE_ID}},
+            {"property": "Chronométreur", "people": {"contains": uid}},
             {"property": "Date",          "date":   {"on_or_after": debut.isoformat()}},
             {"property": "Statut",        "select": {"does_not_equal": "Annulé"}},
             {"property": "Statut",        "select": {"does_not_equal": "Perdu"}},
         ]
-    })
+    }, uid)
 
 
-def _notion_chronos(annee):
+def _notion_chronos(annee, uid=CHRISTOPHE_ID):
     """Tableau de bord : TOUS les chronos de la base (tag « Chrono »), tous statuts
     confondus, pour une année civile donnée (une année à la fois : requêtes
     légères). Le filtrage par statut se fait côté navigateur."""
@@ -186,7 +215,7 @@ def _notion_chronos(annee):
             {"property": "Date", "date": {"before":      f"{annee + 1}-01-01"}},
             {"property": "Tags", "multi_select": {"contains": "Chrono"}},
         ]
-    })
+    }, uid)
     return [e for e in pages if not _est_tache(e["title"])]
 
 
@@ -265,7 +294,7 @@ def _notion_perdus():
     return out
 
 
-def _notion_pages(filtre):
+def _notion_pages(filtre, uid=CHRISTOPHE_ID):
     token = os.environ.get("NOTION_TOKEN")
     if not token:
         raise RuntimeError("NOTION_TOKEN absent")
@@ -323,8 +352,8 @@ def _notion_pages(filtre):
                 "chronometreurs": [x.get("name", "") for x in equipe if x.get("name")],
                 "nb_chrono":      len(equipe),
                 "autres":         [x.get("name", "") for x in equipe
-                                   if x.get("name") and x.get("id") != CHRISTOPHE_ID],
-                "mine":           any(x.get("id") == CHRISTOPHE_ID for x in equipe),
+                                   if x.get("name") and x.get("id") != uid],
+                "mine":           any(x.get("id") == uid for x in equipe),
                 "tags":     ms("Tags"),
                 "techno":   ms("Techno"),
                 "materiel": ms("Matériel Chrono"),

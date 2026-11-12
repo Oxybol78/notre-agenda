@@ -124,3 +124,12 @@ taux de conclusion, répartition par chronométreur et binômes, rythme
 (jours de semaine, records, plus longue pause), puis répartition par type,
 techno, matériel et tâches. Les autres années sont chargées en tâche de fond
 pour le comparatif.
+
+### Un code d'accès par personne
+
+`ACCESS_CODE` = Christophe (Notion + agenda Google perso). `CODE_ROMAIN` et
+`CODE_PAUL` (variables Vercel) ouvrent la même app côté Romain / Paul : « mes
+chronos », « avec qui je fais équipe » et le widget se calculent pour eux, sans
+jamais afficher l'agenda Google de Christophe. Pour ajouter quelqu'un : une ligne
+dans `EQUIPE` (api/agenda.py, identifiant Notion de la personne) + la variable
+`CODE_<PRÉNOM>` sur Vercel, puis Redeploy.

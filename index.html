@@ -358,6 +358,7 @@
   .st-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .st-chip[aria-pressed="false"] { opacity: .38; }
   .st-chip .n { opacity: .75; font-variant-numeric: tabular-nums; }
+  .filt[hidden] { display: none; }
   .btn-icon:disabled { opacity: .3; cursor: default; }
 
   .st-valide  { --c: var(--st-valide);  }
@@ -632,6 +633,19 @@ function couvre(ev, jour) {
 const visibles = () => EVENTS.filter(e => ACTIVE[e.source]);
 
 /** Classe CSS d'un événement : par source dans l'agenda, par statut dans le tableau de bord. */
+/** Mon nom tel qu'il apparaît dans Notion (déduit de mes chronos : équipe moins « les autres »). */
+function monNom() {
+  for (const liste of [DASH, ...Object.values(DASH_CACHE), EVENTS]) {
+    for (const e of liste || []) {
+      if (e.mine && Array.isArray(e.autres)) {
+        const n = (e.chronometreurs || []).find(x => !e.autres.includes(x));
+        if (n) return n;
+      }
+    }
+  }
+  return '';
+}
+
 function stSlug(s) {
   const n = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   if (n === 'valide non signe') return 'nonsigne';
@@ -667,6 +681,9 @@ async function charger(silencieux = false) {
     const d = await r.json();
     EVENTS = d.events || [];
     ERRORS = d.errors || [];
+    // L'agenda Google perso n'existe que pour Christophe : pas de pastille « Perso » pour les autres
+    const fg = document.querySelector('.filt[data-src="google"]');
+    if (fg) fg.hidden = !!d.profil && d.profil !== 'christophe';
 
     document.getElementById('sub').textContent =
       `${EVENTS.length} événements · maj ${d.last_update || '—'}`;
@@ -1401,7 +1418,7 @@ function htmlStats() {
   }
 
   parts.push(panel('Équipe : qui chronomètre quoi',
-    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l.toLowerCase().startsWith('christophe') ? 'h-moi' : 'h-autres' })), '', true) +
+    hbars(eq.slice(0, 8).map(x => ({ l: x.l, n: x.n, sub: `${x.j} j`, cls: x.l === monNom() ? 'h-moi' : 'h-autres' })), '', true) +
     `<div class="chips-row">
       <span class="tag">seul <b>${tailles[1]}</b></span><span class="tag">à 2 <b>${tailles[2]}</b></span>
       <span class="tag">à 3 et + <b>${tailles[3]}</b></span><span class="tag t-warn">non affecté <b>${tailles[0]}</b></span></div>` +
