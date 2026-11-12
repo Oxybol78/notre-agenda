@@ -1584,6 +1584,10 @@ document.querySelectorAll('.filt').forEach(b => {
 (() => {
   let sauve = null;
   try { sauve = localStorage.getItem('agenda_code'); } catch {}
+  // Lien personnel : https://…/?code=XXXX ouvre l'app directement. On laisse le code dans
+  // l'adresse : « Ajouter à l'écran d'accueil » sur iPhone retient l'adresse complète.
+  const lien = new URLSearchParams(location.search).get('code');
+  if (lien) sauve = lien.trim();
   if (sauve) ouvrir(sauve);
 })();
 </script>

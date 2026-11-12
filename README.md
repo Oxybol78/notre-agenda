@@ -127,9 +127,12 @@ pour le comparatif.
 
 ### Un code d'accès par personne
 
-`ACCESS_CODE` = Christophe (Notion + agenda Google perso). `CODE_ROMAIN` et
-`CODE_PAUL` (variables Vercel) ouvrent la même app côté Romain / Paul : « mes
-chronos », « avec qui je fais équipe » et le widget se calculent pour eux, sans
-jamais afficher l'agenda Google de Christophe. Pour ajouter quelqu'un : une ligne
-dans `EQUIPE` (api/agenda.py, identifiant Notion de la personne) + la variable
-`CODE_<PRÉNOM>` sur Vercel, puis Redeploy.
+`ACCESS_CODE` (Vercel) = Christophe : Notion + agenda Google perso. Romain et
+Paul ont chacun un code dont seule l'**empreinte SHA-256** est dans
+`api/agenda.py` (`EQUIPE`) : le dépôt est public, aucun code en clair. Ils
+reçoivent un lien `https://notre-agenda.vercel.app/?code=…` qui ouvre l'app
+directement. « Mes chronos », « avec qui je fais équipe » et le widget se
+calculent pour eux, sans jamais afficher l'agenda Google de Christophe.
+
+Ajouter quelqu'un : générer un code aléatoire, calculer son SHA-256, ajouter une
+entrée dans `EQUIPE` (avec l'identifiant Notion de la personne), pousser.

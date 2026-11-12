@@ -8,11 +8,12 @@ Agrège deux sources en un seul flux :
 Accessible sur : /api/agenda?code=XXXX  (+ &mode=chronos pour le tableau de bord)
 
 Accès : un code par personne. ACCESS_CODE = Christophe (Notion + Google perso) ;
-CODE_ROMAIN, CODE_PAUL = les chronos Notion vus de leur côté (« mes chronos »,
+Romain et Paul ont chacun un code (stocké ici sous forme d'empreinte SHA-256, le
+dépôt étant public) : ils voient les chronos Notion de leur côté (« mes chronos »,
 « avec qui je fais équipe »…), sans jamais l'agenda Google de Christophe.
 
 Variables d'environnement attendues (Vercel) :
-  ACCESS_CODE, CODE_ROMAIN, CODE_PAUL
+  ACCESS_CODE
   NOTION_TOKEN
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
 """
@@ -24,31 +25,34 @@ import urllib.error
 import json
 import os
 import hmac
+import hashlib
 from datetime import date, datetime, timedelta, timezone
 
 NOTION_DB_ID  = "5d07a861-e0a1-4362-8a10-d4ce61acad0c"
 CHRISTOPHE_ID = "345ad871-6b2c-4534-b79a-889b6dabec3d"
 
-# Équipe : identifiant Notion de chaque personne (la clef donne le nom de la
-# variable Vercel : CODE_<CLEF>)
+# Équipe : identifiant Notion + empreinte SHA-256 du code d'accès de chaque personne.
+# (Le dépôt est public : on ne stocke JAMAIS un code en clair.)
 EQUIPE = {
-    "ROMAIN": "5b3af71b-23af-49ef-b1d5-f2c46d651124",
-    "PAUL":   "3bd8fcdb-585d-43f0-94cd-6a1ee314bddd",
+    "romain": {"id":   "5b3af71b-23af-49ef-b1d5-f2c46d651124",
+               "hash": "67649323ba9633b560b96ea9750ed493d9887cbe68de3d3ebd8583ae7a7ec038"},
+    "paul":   {"id":   "3bd8fcdb-585d-43f0-94cd-6a1ee314bddd",
+               "hash": "64511619b3696dfc405b9d4c26aca1017b46a884234f93ca07316a1cd9923269"},
 }
 
 
 def _profil(fourni):
     """Qui est-ce ? -> (nom, id Notion, accès Google) ou None si code inconnu."""
     f = fourni.encode("utf-8")
+    empreinte = hashlib.sha256(f).hexdigest()
     trouve = None
     attendu = os.environ.get("ACCESS_CODE", "")
     # compare_digest : évite de révéler un code par le temps de réponse
     if attendu and hmac.compare_digest(f, attendu.encode("utf-8")):
         trouve = ("christophe", CHRISTOPHE_ID, True)
-    for clef, notion_id in EQUIPE.items():
-        code = os.environ.get(f"CODE_{clef}", "")
-        if code and hmac.compare_digest(f, code.encode("utf-8")) and not trouve:
-            trouve = (clef.lower(), notion_id, False)
+    for nom, p in EQUIPE.items():
+        if hmac.compare_digest(empreinte, p["hash"]) and not trouve:
+            trouve = (nom, p["id"], False)
     return trouve
 
 # Fenêtre de temps affichée
