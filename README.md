@@ -112,3 +112,15 @@ nulle part ailleurs.
 La source **Outlook / Microsoft 365** a été retirée (inutile pour l'usage
 actuel). Les variables `MS_*` peuvent être supprimées de Vercel, et l'app
 Azure *Notre Agenda* du tenant Oxybol n'a plus d'utilité.
+
+#### Sous-onglet « 📊 Stats » (par défaut)
+
+Toutes les stats respectent les filtres Tous/Mes chronos et statuts :
+prochains chronos (J-N), chiffres clés, chronos à relancer / à faire signer,
+alertes planning (chronométreur sur 2 chronos le même jour, validés sans
+équipe, jours à 3 chronos ou plus), calendrier de charge façon GitHub,
+comparatif année après année (avec « à date » vs N-1), pipeline par statut et
+taux de conclusion, répartition par chronométreur et binômes, rythme
+(jours de semaine, records, plus longue pause), puis répartition par type,
+techno, matériel et tâches. Les autres années sont chargées en tâche de fond
+pour le comparatif.
