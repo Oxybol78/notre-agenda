@@ -26,7 +26,9 @@ import json
 import os
 import hmac
 import hashlib
-from datetime import date, datetime, timedelta, timezone
+import sys
+import time as _time
+from datetime import date, datetime, time, timedelta, timezone
 
 NOTION_DB_ID  = "5d07a861-e0a1-4362-8a10-d4ce61acad0c"
 CHRISTOPHE_ID = "345ad871-6b2c-4534-b79a-889b6dabec3d"
@@ -60,6 +62,20 @@ JOURS_PASSE  = 7
 JOURS_FUTUR  = 365
 
 
+def _paris_now():
+    """Date et heure de Paris (heure d'été / d'hiver comprise). Vercel tourne en UTC :
+    sans cela, « aujourd'hui » et l'heure de mise à jour sont décalées."""
+    utc = datetime.now(timezone.utc)
+
+    def dernier_dimanche(annee, mois):
+        d = date(annee, mois, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+
+    debut = datetime.combine(dernier_dimanche(utc.year, 3),  time(1, 0), tzinfo=timezone.utc)
+    fin   = datetime.combine(dernier_dimanche(utc.year, 10), time(1, 0), tzinfo=timezone.utc)
+    return (utc + timedelta(hours=2 if debut <= utc < fin else 1)).replace(tzinfo=None)
+
+
 # ══════════════════════════════════════════════════════════════════════
 #  Handler HTTP
 # ══════════════════════════════════════════════════════════════════════
@@ -72,9 +88,18 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        try:
+            self._get()
+        except Exception as e:      # filet de sécurité : toujours répondre en JSON
+            _log("inattendu", e)
+            self._json({"error": "erreur interne", "events": [], "errors": [str(e)]}, status=500)
+
+    def _get(self):
         # --- Contrôle du code d'accès ---------------------------------
         params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        fourni = (params.get("code") or [""])[0]
+        # L'app envoie le code dans un en-tête (il ne finit pas dans les journaux
+        # d'adresses) ; le paramètre ?code= reste accepté (widget, anciens liens).
+        fourni = self.headers.get("X-Access-Code") or (params.get("code") or [""])[0]
 
         profil = _profil(fourni)
         if not profil:
@@ -105,16 +130,17 @@ class handler(BaseHTTPRequestHandler):
         if (params.get("mode") or [""])[0] == "chronos":
             try:
                 an = (params.get("year") or [""])[0]
-                an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else date.today().year
+                an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else _paris_now().year
                 events = _notion_chronos(an, uid)
                 events.sort(key=lambda e: (e["start"], e["title"]))
                 self._json({
                     "events":      events,
                     "profil":      qui,
                     "errors":      [],
-                    "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
+                    "last_update": _paris_now().strftime("%H:%M"),
                 })
             except Exception as e:
+                _log("chronos", e)
                 self._json({"error": str(e), "events": [], "errors": [f"notion: {e}"]},
                            status=500)
             return
@@ -124,6 +150,7 @@ class handler(BaseHTTPRequestHandler):
             try:
                 self._json({"perdus": _notion_perdus(), "errors": []})
             except Exception as e:
+                _log("perdus", e)
                 self._json({"error": str(e), "perdus": [], "errors": [f"notion: {e}"]}, status=500)
             return
 
@@ -140,6 +167,7 @@ class handler(BaseHTTPRequestHandler):
                 events.extend(fonction())
             except Exception as e:
                 # Une source en panne ne doit pas tuer l'autre
+                _log(nom, e)
                 erreurs.append(f"{nom}: {e}")
 
         events.sort(key=lambda e: (e["start"], e["title"]))
@@ -148,7 +176,7 @@ class handler(BaseHTTPRequestHandler):
             "events":      events,
             "profil":      qui,
             "errors":      erreurs,
-            "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
+            "last_update": _paris_now().strftime("%H:%M"),
         })
 
     # --- utilitaires ---------------------------------------------------
@@ -156,11 +184,15 @@ class handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin",  "*")
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "X-Access-Code")
 
     def _json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        # Données privées : jamais mises en cache (navigateur, proxy, CDN)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self._cors()
         self.end_headers()
         self.wfile.write(body)
@@ -173,20 +205,38 @@ class handler(BaseHTTPRequestHandler):
 #  Helpers réseau
 # ══════════════════════════════════════════════════════════════════════
 
+def _log(source, erreur):
+    """Visible dans les journaux Vercel (jamais le code d'accès ni les jetons)."""
+    print(f"[agenda] {source}: {erreur}", file=sys.stderr)
+
+
 def _req(url, data=None, headers=None, method="GET", form=False):
     if data is not None and not form:
         data = json.dumps(data).encode("utf-8")
     elif form:
         data = urllib.parse.urlencode(data).encode("utf-8")
 
-    r = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
-    with urllib.request.urlopen(r, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    # Notion limite à ~3 requêtes/seconde : sur 429 (ou erreur serveur passagère),
+    # on attend et on réessaie deux fois au plus.
+    for essai in range(3):
+        r = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+        try:
+            with urllib.request.urlopen(r, timeout=9) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 502, 503, 504) and essai < 2:
+                try:
+                    attente = float(e.headers.get("Retry-After", "1"))
+                except ValueError:
+                    attente = 1.0
+                _time.sleep(min(max(attente, 0.5), 2.5))
+                continue
+            raise
 
 
 def _bornes():
     """Fenêtre [aujourd'hui - 7j, aujourd'hui + 365j]."""
-    today = date.today()
+    today = _paris_now().date()
     return today - timedelta(days=JOURS_PASSE), today + timedelta(days=JOURS_FUTUR)
 
 
@@ -197,14 +247,19 @@ def _bornes():
 def _notion(uid=CHRISTOPHE_ID):
     """Agenda partagé : uniquement les chronos où la personne est affectée."""
     debut, _ = _bornes()
-    return _notion_pages({
+    # On remonte large (45 j) puis on garde ce qui n'est pas fini depuis plus de 7 j :
+    # un chrono commencé il y a 10 jours mais qui dure encore doit rester visible.
+    large = debut - timedelta(days=45)
+    evs = _notion_pages({
         "and": [
             {"property": "Chronométreur", "people": {"contains": uid}},
-            {"property": "Date",          "date":   {"on_or_after": debut.isoformat()}},
+            {"property": "Date",          "date":   {"on_or_after": large.isoformat()}},
             {"property": "Statut",        "select": {"does_not_equal": "Annulé"}},
             {"property": "Statut",        "select": {"does_not_equal": "Perdu"}},
         ]
     }, uid)
+    limite = debut.isoformat()
+    return [e for e in evs if (e["end"] or e["start"]) >= limite]
 
 
 def _notion_chronos(annee, uid=CHRISTOPHE_ID):

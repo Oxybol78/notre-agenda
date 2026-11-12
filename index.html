@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="referrer" content="no-referrer" />
 <meta name="theme-color" content="#0f1117" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -315,6 +316,12 @@
     color: var(--text); text-decoration: none;
     padding: 10px; font-size: .85rem; font-weight: 600;
     margin-top: 10px;
+  }
+
+  .sheet-close {
+    display: block; width: 100%; margin-top: 8px;
+    background: transparent; border: 0; color: var(--muted);
+    padding: 10px; font-size: .82rem; font-weight: 600;
   }
 
   /* ═══ TABLEAU DE BORD ═════════════════════════════════════════ */
@@ -665,6 +672,23 @@ function dashVisibles() {
 //  Chargement
 // ══════════════════════════════════════════════════════════════════
 
+/** Appel à l'API : le code part dans un en-tête (pas dans l'adresse, donc pas dans les journaux). */
+function apiGet(qs = '') {
+  let entetes = {};
+  let url = API + (qs ? '?' + qs : '');
+  if (/^[\x20-\xff]*$/.test(CODE)) entetes = { 'X-Access-Code': CODE };
+  else url += (qs ? '&' : '?') + 'code=' + encodeURIComponent(CODE); // caractères exotiques : repli sur l'adresse
+  return fetch(url, { cache: 'no-store', headers: entetes });
+}
+
+/** Sécurité : un lien venant des données ne doit jamais être autre chose que http(s). */
+function nettoyer(liste) {
+  for (const e of liste || []) {
+    if (e && e.url && !/^https?:\/\//i.test(e.url)) e.url = '';
+  }
+  return liste || [];
+}
+
 async function charger(silencieux = false) {
   if (!silencieux) {
     document.getElementById('main').innerHTML =
@@ -672,14 +696,13 @@ async function charger(silencieux = false) {
   }
 
   try {
-    const r = await fetch(`${API}?code=${encodeURIComponent(CODE)}`,
-                          { cache: 'no-store' });
+    const r = await apiGet();
 
     if (r.status === 401) { deconnexion(); return; }
     if (!r.ok) throw new Error('HTTP ' + r.status);
 
     const d = await r.json();
-    EVENTS = d.events || [];
+    EVENTS = nettoyer(d.events);
     ERRORS = d.errors || [];
     // L'agenda Google perso n'existe que pour Christophe : pas de pastille « Perso » pour les autres
     const fg = document.querySelector('.filt[data-src="google"]');
@@ -723,15 +746,14 @@ async function chargerDash(silencieux = false, force = false) {
   }
 
   try {
-    const r = await fetch(`${API}?code=${encodeURIComponent(CODE)}&mode=chronos&year=${an}`,
-                          { cache: 'no-store' });
+    const r = await apiGet(`mode=chronos&year=${an}`);
 
     if (r.status === 401) { deconnexion(); return; }
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
 
     // L'utilisateur a changé d'année pendant le chargement : on garde en cache, sans afficher
-    DASH_CACHE[an] = d.events || [];
+    DASH_CACHE[an] = nettoyer(d.events);
     if (an !== DASH_YEAR) return;
 
     DASH = DASH_CACHE[an];
@@ -765,6 +787,7 @@ function dashSetYear(y, mois) {
 function deconnexion() {
   CODE = '';
   try { localStorage.removeItem('agenda_code'); } catch {}
+  try { history.replaceState(null, '', location.pathname); } catch {}   // ôte un ?code= refusé
   document.getElementById('app').hidden  = true;
   document.getElementById('gate').style.display = 'flex';
   document.getElementById('gateErr').textContent = 'Code refusé. Réessaie.';
@@ -1289,7 +1312,7 @@ function htmlComparatif(evsBrut) {
   }
 
   const corps = delta + '<div class="hbars">' + lignes.map(l => {
-    if (!l.charge) return `<div class="hrow"><span class="hl">${l.y}</span><span class="ht"></span><span class="hn">…</span></div>`;
+    if (!l.charge) return `<div class="hrow"><span class="hl">${l.y}</span><span class="ht"></span><span class="hn">${ANNEES_FINI ? '—' : '…'}</span></div>`;
     const w = v => (v / max * 100).toFixed(1) + '%';
     return `<div class="hrow${l.y === DASH_YEAR ? ' sel' : ''}" data-y="${l.y}">
       <span class="hl">${l.y}</span>
@@ -1300,7 +1323,7 @@ function htmlComparatif(evsBrut) {
 
   const ok = lignes.every(l => l.charge);
   return panel('Année après année', corps,
-    `<span><i style="background:var(--chrono)"></i>Moi</span><span><i style="background:#4a5170"></i>Autres</span><span>Touche une année pour l'ouvrir${ok ? '' : ' · chargement…'}</span>`);
+    `<span><i style="background:var(--chrono)"></i>Moi</span><span><i style="background:#4a5170"></i>Autres</span><span>Touche une année pour l'ouvrir${ok ? '' : ANNEES_FINI ? ' · année indisponible : actualise (↻)' : ' · chargement…'}</span>`);
 }
 
 function htmlStats() {
@@ -1460,7 +1483,7 @@ function htmlStats() {
   parts.push(rep('Matériel utilisé', e => e.materiel, 'h-mat'));
   parts.push(rep('Tâches et préparatifs', e => (e.tags || []).filter(t => t !== 'Chrono'), 'h-tache'));
 
-  if (!evs.length) return '<div class="state"><strong>Aucun chrono</strong>Rien ne correspond aux filtres sélectionnés pour ' + an + '.</div>' + parts.slice(-1)[0];
+  if (!evs.length) return '<div class="state"><strong>Aucun chrono</strong>Rien ne correspond aux filtres sélectionnés pour ' + an + '.</div>';
   return parts.join('');
 }
 
@@ -1470,7 +1493,7 @@ async function chargerPerdus() {
   if (PERDUS_TENTE) return;
   PERDUS_TENTE = true;
   try {
-    const r = await fetch(`${API}?code=${encodeURIComponent(CODE)}&mode=perdus`, { cache: 'no-store' });
+    const r = await apiGet('mode=perdus');
     if (!r.ok) return;
     PERDUS_LIST = (await r.json()).perdus || [];
     if (VIEW === 'dash' && DASH_SUB === 'stats') { const y = window.scrollY; rendre(); window.scrollTo(0, y); }
@@ -1478,20 +1501,30 @@ async function chargerPerdus() {
 }
 
 let ANNEES_TENTEES = false;
+let ANNEES_FINI = false;
 async function chargerAnnees() {
   if (ANNEES_TENTEES) return;
   ANNEES_TENTEES = true;
+  ANNEES_FINI = false;
   const manquantes = [];
   for (let y = YEAR_MIN; y <= TODAY.getFullYear() + 3; y++) if (!DASH_CACHE[y]) manquantes.push(y);
-  await Promise.all(manquantes.map(async y => {
-    try {
-      const r = await fetch(`${API}?code=${encodeURIComponent(CODE)}&mode=chronos&year=${y}`, { cache: 'no-store' });
-      if (!r.ok) return;
-      const d = await r.json();
-      DASH_CACHE[y] = d.events || [];
-      DASH_CACHE[y].forEach(e => { const s = e.statut || '—'; if (!(s in DASH_ST)) DASH_ST[s] = STATUTS_DEFAUT.includes(s); });
-    } catch {}
-  }));
+
+  const charge = async y => {
+    for (let essai = 0; essai < 2; essai++) {          // un 2e essai : Notion limite le débit
+      try {
+        const r = await apiGet(`mode=chronos&year=${y}`);
+        if (r.status === 401) return;
+        if (!r.ok) { await new Promise(ok => setTimeout(ok, 1200)); continue; }
+        DASH_CACHE[y] = nettoyer((await r.json()).events);
+        DASH_CACHE[y].forEach(e => { const s = e.statut || '—'; if (!(s in DASH_ST)) DASH_ST[s] = STATUTS_DEFAUT.includes(s); });
+        return;
+      } catch { await new Promise(ok => setTimeout(ok, 1200)); }
+    }
+  };
+  // Deux années à la fois seulement, pour ne pas saturer Notion (≈ 3 requêtes/s)
+  for (let i = 0; i < manquantes.length; i += 2) await Promise.all(manquantes.slice(i, i + 2).map(charge));
+
+  ANNEES_FINI = true;
   if (VIEW === 'dash' && DASH_SUB === 'stats') { const y = window.scrollY; rendre(); window.scrollTo(0, y); }
 }
 
@@ -1519,9 +1552,18 @@ function detail(ev) {
       ${equipeLigne(ev)}
       ${chipsEv(ev) ? `<div class="ev-tags" style="margin-bottom:6px">${chipsEv(ev)}</div>` : ''}
       ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
+      <button type="button" class="sheet-close">Fermer</button>
     </div>`;
 
-  sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+  // Une seule fiche à la fois ; on ferme en touchant le fond, « Fermer » ou la touche Échap
+  document.querySelectorAll('.sheet').forEach(x => x.remove());
+  const fermer = () => { sheet.remove(); document.removeEventListener('keydown', surEchap); };
+  const surEchap = e => { if (e.key === 'Escape') fermer(); };
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.onclick = e => { if (e.target === sheet) fermer(); };
+  sheet.querySelector('.sheet-close').onclick = fermer;
+  document.addEventListener('keydown', surEchap);
   document.body.appendChild(sheet);
 }
 
@@ -1546,8 +1588,13 @@ document.getElementById('codeInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('gateBtn').click();
 });
 
-document.getElementById('btnRefresh').onclick = () =>
-  VIEW === 'dash' ? chargerDash(true, true) : charger(true);
+document.getElementById('btnRefresh').onclick = () => {
+  if (VIEW !== 'dash') { charger(true); return; }
+  // Actualiser = tout relire dans Notion : année affichée, autres années du comparatif, perdus
+  for (const k of Object.keys(DASH_CACHE)) if (+k !== DASH_YEAR) delete DASH_CACHE[k];
+  ANNEES_TENTEES = false; PERDUS_TENTE = false;
+  chargerDash(true, true);
+};
 
 function setView(v) {
   VIEW = v;

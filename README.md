@@ -136,3 +136,15 @@ calculent pour eux, sans jamais afficher l'agenda Google de Christophe.
 
 Ajouter quelqu'un : générer un code aléatoire, calculer son SHA-256, ajouter une
 entrée dans `EQUIPE` (avec l'identifiant Notion de la personne), pousser.
+
+### Sécurité et fiabilité
+
+- Le code d'accès voyage dans un en-tête (`X-Access-Code`), pas dans l'adresse :
+  il n'apparaît pas dans les journaux. Le paramètre `?code=` reste accepté
+  (widget d'origine, liens d'équipe). Les réponses ne sont jamais mises en cache.
+- Les textes venant de Notion/Google sont échappés avant affichage ; seuls les
+  liens `http(s)` sont cliquables.
+- L'heure affichée est celle de Paris (heure d'été/hiver incluse).
+- Notion limite le débit : l'API réessaie sur 429 et l'app charge les autres
+  années deux par deux.
+- Tests : `python3 -m unittest discover -s tests -v` (aucun accès réseau).
