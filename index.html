@@ -572,7 +572,7 @@ let DASH_ST     = {};            // { 'Validé': true, ... } — complété au f
 let DASH_YEAR   = new Date().getFullYear();
 let DASH_WHEN   = 'upcoming';    // année en cours : 'upcoming' (à venir) | 'all' (toute l'année)
 const DASH_CACHE = {};           // année -> événements déjà chargés
-const DASH_SD    = {};           // année -> perdus/annulés sans date (rattachés à l'année de création)
+let   PERDUS_LIST = null;        // fiches perdues/annulées/reportées sans date (chargées une fois), avec leur année
 const YEAR_MIN  = 2022;          // début des archives Oxybol dans Notion
 const YEAR_MAX  = new Date().getFullYear() + 4;
 let CUR_LIST    = EVENTS;        // liste dans laquelle le calendrier retrouve ses événements
@@ -714,7 +714,6 @@ async function chargerDash(silencieux = false, force = false) {
 
     // L'utilisateur a changé d'année pendant le chargement : on garde en cache, sans afficher
     DASH_CACHE[an] = d.events || [];
-    DASH_SD[an]    = d.sans_date || [];
     if (an !== DASH_YEAR) return;
 
     DASH = DASH_CACHE[an];
@@ -1125,6 +1124,7 @@ function brancherDash() {
   if (DASH_SUB === 'cal') brancherCalendrier();
   if (DASH_SUB === 'stats') {
     chargerAnnees();
+    chargerPerdus();
     // Toucher une année du comparatif l'ouvre
     document.querySelectorAll('.hrow[data-y]').forEach(r => {
       r.style.cursor = 'pointer';
@@ -1362,7 +1362,7 @@ function htmlStats() {
   const nbSt = {};
   base.forEach(e => { const s = e.statut || '—'; nbSt[s] = (nbSt[s] || 0) + 1; });
   // Perdus / annulés dont la date a été effacée : rattachés à l'année de création de la fiche
-  const sd = DASH_SCOPE === 'all' ? (DASH_SD[an] || []) : [];
+  const sd = DASH_SCOPE === 'all' ? (PERDUS_LIST || []).filter(e => e.an === an) : [];
   sd.forEach(e => { nbSt[e.statut] = (nbSt[e.statut] || 0) + 1; });
   const stOrdre = Object.keys(nbSt).sort(ordreStatut);
   const tot = (base.length + sd.length) || 1;
@@ -1373,7 +1373,8 @@ function htmlStats() {
     `<div class="stack">${stOrdre.map(s => `<i class="st-${stSlug(s)}" style="width:${(nbSt[s] / tot * 100).toFixed(1)}%" title="${esc(lblStatut(s))} : ${nbSt[s]}"></i>`).join('')}</div>
      <div class="stlist">${stOrdre.map(s => `<span class="st-${stSlug(s)}"><i></i>${esc(lblStatut(s))} <b>${nbSt[s]}</b></span>`).join('')}</div>` +
     (taux !== null ? `<div class="delta">Taux de conclusion : <b>${taux} %</b> <span>(${concl} concrétisés contre ${perdu} perdus ou annulés, options en attente non comptées)</span></div>` : '') +
-    (sd.length ? `<div class="note">${sd.length} fiches sans date (perdues, annulées, reportées…) sont rattachées à l'année où la demande a été créée dans Notion.</div>` : '')));
+    (sd.length ? `<div class="note">${sd.length} fiches sans date (perdues, annulées, reportées…) sont rattachées à l'année de l'événement${
+      sd.some(e => e.source === 'creation') ? ` (retrouvée via la synchro Google Agenda ; pour ${sd.filter(e => e.source === 'creation').length} d'entre elles, année de création de la fiche à défaut)` : ' (retrouvée via la synchro Google Agenda)'}.</div>` : '')));
 
   // 7. Équipe -------------------------------------------------------
   const eq = compter(evs, e => e.chronometreurs);
@@ -1433,6 +1434,18 @@ function htmlStats() {
 }
 
 /** Charge en tâche de fond toutes les années pour le comparatif. */
+let PERDUS_TENTE = false;
+async function chargerPerdus() {
+  if (PERDUS_TENTE) return;
+  PERDUS_TENTE = true;
+  try {
+    const r = await fetch(`${API}?code=${encodeURIComponent(CODE)}&mode=perdus`, { cache: 'no-store' });
+    if (!r.ok) return;
+    PERDUS_LIST = (await r.json()).perdus || [];
+    if (VIEW === 'dash' && DASH_SUB === 'stats') { const y = window.scrollY; rendre(); window.scrollTo(0, y); }
+  } catch {}
+}
+
 let ANNEES_TENTEES = false;
 async function chargerAnnees() {
   if (ANNEES_TENTEES) return;
@@ -1445,7 +1458,6 @@ async function chargerAnnees() {
       if (!r.ok) return;
       const d = await r.json();
       DASH_CACHE[y] = d.events || [];
-      DASH_SD[y]    = d.sans_date || [];
       DASH_CACHE[y].forEach(e => { const s = e.statut || '—'; if (!(s in DASH_ST)) DASH_ST[s] = STATUTS_DEFAUT.includes(s); });
     } catch {}
   }));

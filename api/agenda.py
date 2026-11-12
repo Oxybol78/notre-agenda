@@ -78,19 +78,22 @@ class handler(BaseHTTPRequestHandler):
                 an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else date.today().year
                 events = _notion_chronos(an)
                 events.sort(key=lambda e: (e["start"], e["title"]))
-                try:
-                    sans_date = _notion_sans_date(an)
-                except Exception:
-                    sans_date = []   # bonus : ne doit jamais bloquer le tableau de bord
                 self._json({
                     "events":      events,
-                    "sans_date":   sans_date,
                     "errors":      [],
                     "last_update": datetime.now(timezone(timedelta(hours=2))).strftime("%H:%M"),
                 })
             except Exception as e:
                 self._json({"error": str(e), "events": [], "errors": [f"notion: {e}"]},
                            status=500)
+            return
+
+        # --- Mode « perdus » : fiches perdues / annulées / reportées sans date ---
+        if (params.get("mode") or [""])[0] == "perdus":
+            try:
+                self._json({"perdus": _notion_perdus(), "errors": []})
+            except Exception as e:
+                self._json({"error": str(e), "perdus": [], "errors": [f"notion: {e}"]}, status=500)
             return
 
         # --- Collecte des deux sources --------------------------------
@@ -177,31 +180,52 @@ def _notion_chronos(annee):
     légères). Le filtrage par statut se fait côté navigateur."""
     # La base mélange chronos, séminaires, congés, récups, télétravail, RDV...
     # Seuls les éléments taggés « Chrono » sont des chronos.
-    return _notion_pages({
+    pages = _notion_pages({
         "and": [
             {"property": "Date", "date": {"on_or_after": f"{annee}-01-01"}},
             {"property": "Date", "date": {"before":      f"{annee + 1}-01-01"}},
             {"property": "Tags", "multi_select": {"contains": "Chrono"}},
         ]
     })
+    return [e for e in pages if not _est_tache(e["title"])]
+
+
+# Fiches taguées « Chrono » qui sont en fait des tâches de préparation ou des tests
+_TACHES = ("dossard", "collage", "corne de brume", "médaille", "medaille",
+           "t-shirt", "tshirt", "personnalisation arche")
+
+
+def _est_tache(titre):
+    t = (titre or "").strip().lower()
+    return t == "test" or t.startswith(_TACHES)
 
 
 PERDUS = ("Perdu", "Annulé", "Reporté", "Déjà Client à relancer",
           "Client relancé en attente de retour")
 
 
-def _notion_sans_date(annee):
-    """Chronos perdus / annulés / reportés : leur date est effacée dans Notion.
-    On les rattache à l'année de CRÉATION de la fiche (la demande du client)."""
+def _date_synchro(texte):
+    """La synchro Google Agenda garde la date de l'événement (AAAAMMJJ) dans le champ
+    technique « Notion Automation Data », même quand la date Notion a été effacée."""
+    import re
+    m = re.search(r";(20\d{2})(\d{2})(\d{2});[a-z]+\s*$", texte or "")
+    if not m:
+        return ""
+    a, mo, j = m.groups()
+    return f"{a}-{mo}-{j}" if 1 <= int(mo) <= 12 and 1 <= int(j) <= 31 else ""
+
+
+def _notion_perdus():
+    """Fiches perdues / annulées / reportées dont la date a été effacée dans Notion.
+    Année de rattachement : date de l'événement retrouvée dans la synchro Google
+    (« historique »), sinon année de création de la fiche (« creation »)."""
     token = os.environ.get("NOTION_TOKEN")
     if not token:
-        return []
+        raise RuntimeError("NOTION_TOKEN absent")
     body = {
         "filter": {"and": [
             {"property": "Tags", "multi_select": {"contains": "Chrono"}},
             {"property": "Date", "date": {"is_empty": True}},
-            {"timestamp": "created_time", "created_time": {"on_or_after": f"{annee}-01-01"}},
-            {"timestamp": "created_time", "created_time": {"before": f"{annee + 1}-01-01"}},
             {"or": [{"property": "Statut", "select": {"equals": st}} for st in PERDUS]},
         ]},
         "page_size": 100,
@@ -219,11 +243,20 @@ def _notion_sans_date(annee):
                     data=body, headers=headers, method="POST")
         for page in data.get("results", []):
             p = page.get("properties", {})
+            titre = "".join(b.get("plain_text", "")
+                            for b in p.get("Evènement", {}).get("title", [])).strip()
+            if _est_tache(titre):
+                continue
+            nad = "".join(b.get("plain_text", "")
+                          for b in p.get("Notion Automation Data", {}).get("rich_text", []))
+            d = _date_synchro(nad)
+            cree = (page.get("created_time") or "")[:10]
             out.append({
                 "statut": (p.get("Statut", {}).get("select") or {}).get("name", ""),
-                "cree":   (page.get("created_time") or "")[:10],
-                "title":  "".join(b.get("plain_text", "")
-                                  for b in p.get("Evènement", {}).get("title", [])).strip(),
+                "an":     int((d or cree)[:4] or 0),
+                "date":   d,
+                "source": "historique" if d else "creation",
+                "title":  titre,
                 "url":    page.get("url", ""),
             })
         if not data.get("has_more"):
