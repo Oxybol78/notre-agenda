@@ -238,6 +238,8 @@ def _notion_pages(filtre):
                 "statut":   (p.get("Statut", {}).get("select") or {}).get("name", ""),
                 "chronometreurs": [x.get("name", "") for x in equipe if x.get("name")],
                 "nb_chrono":      len(equipe),
+                "autres":         [x.get("name", "") for x in equipe
+                                   if x.get("name") and x.get("id") != CHRISTOPHE_ID],
                 "mine":           any(x.get("id") == CHRISTOPHE_ID for x in equipe),
                 "tags":     ms("Tags"),
                 "techno":   ms("Techno"),

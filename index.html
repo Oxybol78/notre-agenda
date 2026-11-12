@@ -226,6 +226,12 @@
     padding: 2px 6px;
     font-size: .66rem;
   }
+  .tag.t-techno { color: #7dd3fc; border-color: #38bdf855; }
+  .tag.t-type   { color: #c4b5fd; border-color: #a78bfa55; }
+  .tag.t-mat    { color: var(--muted); }
+  .tag.t-tache  { color: #fcd34d; border-color: #f59e0b55; }
+  .ev-team { margin-top: 6px; font-size: .78rem; }
+  .ev-team.solo { color: var(--muted); }
   .badge-today {
     background: var(--accent); color: #fff;
     border-radius: 4px; padding: 1px 5px;
@@ -710,6 +716,23 @@ function rendre() {
   if (VIEW === 'cal') brancherCalendrier();
 }
 
+/* ─── Détails d'un chrono (étiquettes colorées, équipe) ─── */
+
+/** Étiquettes : techno (bleu), type (violet), matériel (gris), tâches Notion (jaune : Dossards, Collage des puces…). */
+function chipsEv(ev) {
+  const g = (arr, cls) => (arr || []).map(t => `<span class="tag ${cls}">${esc(t)}</span>`).join('');
+  const taches = (ev.tags || []).filter(t => t !== 'Chrono'); // « Chrono » = tous, inutile de le répéter
+  return g(ev.techno, 't-techno') + g(ev.type, 't-type') + g(ev.materiel, 't-mat') + g(taches, 't-tache');
+}
+
+/** « 👤 avec Paul, Romain » ou « 👤 seul » (agenda : chronos où je suis affecté). */
+function equipeLigne(ev) {
+  if (ev.source !== 'notion' || !Array.isArray(ev.autres)) return '';
+  return ev.autres.length
+    ? `<div class="ev-team">👤 avec <strong>${esc(ev.autres.join(', '))}</strong></div>`
+    : `<div class="ev-team solo">👤 seul sur ce chrono</div>`;
+}
+
 /* ─── Liste ─── */
 
 function htmlListe() {
@@ -745,11 +768,10 @@ function htmlListe() {
       duree,
       ev.lieu ? '📍 ' + esc(ev.lieu) : '',
       ev.calendrier && ev.source === 'google' ? esc(ev.calendrier) : '',
-      ev.statut ? esc(ev.statut) : '',
+      ev.statut ? `<span class="badge stat st-${stSlug(ev.statut)}">${esc(ev.statut)}</span>` : '',
     ].filter(Boolean).map(x => `<span>${x}</span>`).join('');
 
-    const tags = [...(ev.techno||[]), ...(ev.type||[]), ...(ev.materiel||[])]
-      .map(t => `<span class="tag">${esc(t)}</span>`).join('');
+    const tags = chipsEv(ev);
 
     const tag = ev.url ? 'a' : 'div';
     const attrs = ev.url ? ` href="${esc(ev.url)}" target="_blank" rel="noopener"` : '';
@@ -765,6 +787,7 @@ function htmlListe() {
             ${auj ? '<span class="badge-today">AUJOURD\'HUI</span>' : ''}
           </div>
           <div class="ev-meta">${meta}</div>
+          ${equipeLigne(ev)}
           ${tags ? `<div class="ev-tags">${tags}</div>` : ''}
         </div>
       </${tag}>`;
@@ -984,8 +1007,7 @@ function htmlDashListe(liste) {
       equipe,
     ].filter(Boolean).map(x => `<span>${x}</span>`).join('');
 
-    const tags = [...(ev.techno||[]), ...(ev.type||[]), ...(ev.materiel||[])]
-      .map(t => `<span class="tag">${esc(t)}</span>`).join('');
+    const tags = chipsEv(ev);
 
     const tag = ev.url ? 'a' : 'div';
     const attrs = ev.url ? ` href="${esc(ev.url)}" target="_blank" rel="noopener"` : '';
@@ -1055,6 +1077,8 @@ function detail(ev) {
     <div class="sheet-box">
       <h3>${esc(ev.title)}</h3>
       <div class="ev-meta">${meta}</div>
+      ${equipeLigne(ev)}
+      ${chipsEv(ev) ? `<div class="ev-tags" style="margin-bottom:6px">${chipsEv(ev)}</div>` : ''}
       ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
     </div>`;
 
