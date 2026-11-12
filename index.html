@@ -358,11 +358,12 @@
 
   .st-valide  { --c: var(--st-valide);  }
   .st-option  { --c: var(--st-option);  }
+  .st-nonsigne { --c: #fb923c; }
   .st-reporte { --c: var(--st-reporte); }
   .st-annule  { --c: var(--st-annule);  }
   .st-perdu   { --c: var(--st-perdu);   }
   .st-autre   { --c: var(--st-autre);   }
-  .st-chip.st-valide, .st-chip.st-option, .st-chip.st-reporte,
+  .st-chip.st-valide, .st-chip.st-option, .st-chip.st-nonsigne, .st-chip.st-reporte,
   .st-chip.st-annule, .st-chip.st-perdu,  .st-chip.st-autre { color: var(--c); }
 
   .ev[class*="st-"]     { border-left-color: var(--c); }
@@ -502,8 +503,8 @@ let DASH_SUB    = 'list';        // 'list' | 'cal'
 let DASH_ST     = null;          // { 'Validé': true, ... } — initialisé au chargement
 let CUR_LIST    = EVENTS;        // liste dans laquelle le calendrier retrouve ses événements
 
-const STATUTS_ORDRE   = ['Validé', 'Option', 'Reporté', 'Annulé', 'Perdu'];
-const STATUTS_DEFAUT  = ['Validé', 'Option'];
+const STATUTS_ORDRE   = ['Validé', 'Validé non signé', 'Option', 'Reporté', 'Annulé', 'Perdu'];
+const STATUTS_DEFAUT  = ['Validé', 'Validé non signé', 'Option'];
 
 const DOW    =['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 const DOW_S  = ['dim','lun','mar','mer','jeu','ven','sam'];
@@ -558,6 +559,7 @@ const visibles = () => EVENTS.filter(e => ACTIVE[e.source]);
 /** Classe CSS d'un événement : par source dans l'agenda, par statut dans le tableau de bord. */
 function stSlug(s) {
   const n = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (n === 'valide non signe') return 'nonsigne';
   return ['valide', 'option', 'reporte', 'annule', 'perdu'].includes(n) ? n : 'autre';
 }
 const clsEv = e => VIEW === 'dash' ? 'st-' + stSlug(e.statut) : CLS[e.source];
@@ -825,10 +827,10 @@ function htmlDash() {
   const aVenir  = evs.filter(e => { const d = dayOf(e.start); return d && d >= TODAY; });
   const ceMois  = evs.filter(e => { const d = dayOf(e.start); return d && d.getFullYear() === an && d.getMonth() === mois; });
   const aMoi    = aVenir.filter(e => e.mine);
-  // « À affecter » : chronos à venir, pas encore perdus/annulés/reportés, sans personne dessus
+  // « À affecter » : chronos à venir (Validé, Validé non signé, Option) sans personne dessus
   const aAffecter = DASH.filter(e => {
     const d = dayOf(e.start);
-    return d && d >= TODAY && !e.nb_chrono && ['Validé', 'Option'].includes(e.statut);
+    return d && d >= TODAY && !e.nb_chrono && ['Validé', 'Validé non signé', 'Option'].includes(e.statut);
   });
 
   const kpi = (n, l, cls = '') =>

@@ -168,12 +168,17 @@ def _notion():
 
 
 def _notion_chronos():
-    """Tableau de bord : TOUS les chronos de la base, tous statuts confondus,
+    """Tableau de bord : TOUS les chronos de la base (tag « Chrono »), tous statuts confondus,
     depuis le 1er janvier de l'année en cours (pour les stats mensuelles).
     Le filtrage par statut se fait côté navigateur."""
     debut = date(date.today().year, 1, 1)
+    # La base mélange chronos, séminaires, congés, récups, télétravail, RDV...
+    # Seuls les éléments taggés « Chrono » sont des chronos.
     return _notion_pages({
-        "property": "Date", "date": {"on_or_after": debut.isoformat()}
+        "and": [
+            {"property": "Date", "date": {"on_or_after": debut.isoformat()}},
+            {"property": "Tags", "multi_select": {"contains": "Chrono"}},
+        ]
     })
 
 
