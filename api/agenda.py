@@ -1,10 +1,9 @@
 """
 Fonction serverless Vercel — Agenda unifié
 ===========================================
-Agrège trois sources en un seul flux :
+Agrège deux sources en un seul flux :
   - Notion          → les chronos où Christophe est affecté
   - Google Calendar → agenda perso Gmail
-  - Outlook / Graph → agenda pro Oxybol
 
 Accessible sur : /api/agenda?code=XXXX  (+ &mode=chronos pour le tableau de bord)
 
@@ -12,7 +11,6 @@ Variables d'environnement attendues (Vercel) :
   ACCESS_CODE
   NOTION_TOKEN
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
-  MS_CLIENT_ID, MS_TENANT_ID, MS_REFRESH_TOKEN
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -88,19 +86,18 @@ class handler(BaseHTTPRequestHandler):
                            status=500)
             return
 
-        # --- Collecte des trois sources -------------------------------
+        # --- Collecte des deux sources --------------------------------
         events  = []
         erreurs = []
 
         for nom, fonction in (
             ("notion",  _notion),
             ("google",  _google),
-            ("outlook", _outlook),
         ):
             try:
                 events.extend(fonction())
             except Exception as e:
-                # Une source en panne ne doit pas tuer les deux autres
+                # Une source en panne ne doit pas tuer l'autre
                 erreurs.append(f"{nom}: {e}")
 
         events.sort(key=lambda e: (e["start"], e["title"]))
@@ -357,75 +354,5 @@ def _google():
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
-
-    return out
-
-
-# ══════════════════════════════════════════════════════════════════════
-#  Source 3 — Outlook / Microsoft Graph
-# ══════════════════════════════════════════════════════════════════════
-
-def _ms_token():
-    cid    = os.environ.get("MS_CLIENT_ID")
-    tenant = os.environ.get("MS_TENANT_ID")
-    refr   = os.environ.get("MS_REFRESH_TOKEN")
-
-    if not all((cid, tenant, refr)):
-        raise RuntimeError("variables Microsoft incomplètes")
-
-    # Client public : pas de client_secret
-    data = _req(
-        f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
-        data={
-            "client_id":     cid,
-            "refresh_token": refr,
-            "grant_type":    "refresh_token",
-            "scope":         "offline_access Calendars.Read",
-        },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST", form=True,
-    )
-    return data["access_token"]
-
-
-def _outlook():
-    token = _ms_token()
-    hdr = {
-        "Authorization": f"Bearer {token}",
-        "Prefer": 'outlook.timezone="Europe/Paris"',
-    }
-
-    debut, fin = _bornes()
-
-    params = urllib.parse.urlencode({
-        "startDateTime": f"{debut.isoformat()}T00:00:00",
-        "endDateTime":   f"{fin.isoformat()}T00:00:00",
-        "$select":       "subject,start,end,isAllDay,location,webLink",
-        "$orderby":      "start/dateTime",
-        "$top":          "250",
-    })
-
-    url = f"https://graph.microsoft.com/v1.0/me/calendarView?{params}"
-    out = []
-
-    while url:
-        data = _req(url, headers=hdr)
-
-        for ev in data.get("value", []):
-            s = (ev.get("start") or {}).get("dateTime", "")[:19]
-            e = (ev.get("end")   or {}).get("dateTime", "")[:19]
-            all_day = ev.get("isAllDay", False)
-
-            out.append({
-                "source":  "outlook",
-                "title":   ev.get("subject") or "(sans titre)",
-                "start":   s[:10] if all_day else s,
-                "end":     e[:10] if all_day else e,
-                "allDay":  all_day,
-                "url":     ev.get("webLink", ""),
-                "lieu":    ((ev.get("location") or {}).get("displayName") or ""),
-            })
-
-        url = data.get("@odata.nextLink")
 
     return out

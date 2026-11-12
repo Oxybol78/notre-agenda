@@ -21,7 +21,6 @@
     /* Une couleur par source : c'est la clé de lecture de toute l'app */
     --chrono:   #f97316;
     --perso:    #22c55e;
-    --pro:      #38bdf8;
 
     --radius:   10px;
   }
@@ -153,7 +152,6 @@
   .filt[aria-pressed="false"] { opacity: .38; }
   .filt.chrono { color: var(--chrono); }
   .filt.perso  { color: var(--perso);  }
-  .filt.pro    { color: var(--pro);    }
 
   /* ═══ CONTENU ═════════════════════════════════════════════════ */
 
@@ -198,7 +196,6 @@
   }
   .ev.chrono { border-left-color: var(--chrono); }
   .ev.perso  { border-left-color: var(--perso);  }
-  .ev.pro    { border-left-color: var(--pro);    }
   .ev.today  { background: var(--card2); }
 
   .ev-date {
@@ -285,7 +282,6 @@
   }
   .cal-ev.chrono { border-left-color: var(--chrono); color: #fdba74; }
   .cal-ev.perso  { border-left-color: var(--perso);  color: #86efac; }
-  .cal-ev.pro    { border-left-color: var(--pro);    color: #7dd3fc; }
   .cal-more { font-size: .55rem; color: var(--muted); padding-left: 3px; }
 
   /* ─── Détail (clic sur un événement du calendrier) ─── */
@@ -473,7 +469,6 @@
     <div class="filters" id="srcFilters">
       <button class="filt chrono" data-src="notion"  aria-pressed="true"><span class="dot"></span>Chronos</button>
       <button class="filt perso"  data-src="google"  aria-pressed="true"><span class="dot"></span>Perso</button>
-      <button class="filt pro"    data-src="outlook" aria-pressed="true"><span class="dot"></span>Oxybol</button>
     </div>
   </header>
 
@@ -491,7 +486,7 @@ let CODE    = '';
 let EVENTS  = [];
 let ERRORS  = [];
 let VIEW    = 'list';
-let ACTIVE  = { notion: true, google: true, outlook: true };
+let ACTIVE  = { notion: true, google: true };
 let CAL_REF = new Date();
 
 // Tableau de bord (tous les chronos Notion)
@@ -513,8 +508,8 @@ const MONTHS = ['janvier','février','mars','avril','mai','juin',
 
 const TODAY = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
 
-const CLS = { notion: 'chrono', google: 'perso', outlook: 'pro' };
-const LBL = { notion: 'Chrono', google: 'Perso',  outlook: 'Oxybol' };
+const CLS = { notion: 'chrono', google: 'perso' };
+const LBL = { notion: 'Chrono', google: 'Perso' };
 
 // ══════════════════════════════════════════════════════════════════
 //  Utilitaires

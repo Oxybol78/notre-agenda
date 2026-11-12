@@ -1,13 +1,12 @@
 # Notre Agenda
 
 Agenda unifié de Christophe, partagé avec Flo.
-Agrège trois sources en une seule page :
+Agrège deux sources en une seule page :
 
 | Source | Contenu | Couleur |
 |---|---|---|
 | **Notion** | Les chronos où Christophe est affecté | 🟠 orange |
 | **Google Calendar** | Agenda perso (Gmail) | 🟢 vert |
-| **Outlook / M365** | Agenda pro Oxybol | 🔵 bleu |
 
 ---
 
@@ -15,12 +14,12 @@ Agrège trois sources en une seule page :
 
 ```
 Notion  ─┐
-Google  ─┼──►  /api/agenda  ──►  index.html
-Outlook ─┘     (serverless)      (PWA)
+Google  ─┴──►  /api/agenda  ──►  index.html
+               (serverless)      (PWA)
 ```
 
 - `api/agenda.py` — proxy serverless Python. Porte les tokens,
-  interroge les trois API, renvoie un JSON fusionné.
+  interroge les API, renvoie un JSON fusionné.
 - `index.html` — l'app. Vue liste + vue calendrier, filtres par source.
 
 ### Onglet « Tableau de bord »
@@ -55,9 +54,6 @@ variables d'environnement Vercel.
 | `GOOGLE_CLIENT_ID` | console.cloud.google.com → projet *API Calendar* → Clients |
 | `GOOGLE_CLIENT_SECRET` | idem (visible une seule fois à la création) |
 | `GOOGLE_REFRESH_TOKEN` | script `get_token.py` |
-| `MS_CLIENT_ID` | portal.azure.com → app *Notre Agenda* → Vue d'ensemble |
-| `MS_TENANT_ID` | idem |
-| `MS_REFRESH_TOKEN` | script `get_token_ms2.py` |
 
 ⚠️ Après toute modification de variable : **redéployer** (Deployments →
 … → Redeploy). Vercel ne recharge pas les variables à chaud.
@@ -78,22 +74,9 @@ Projet **API Calendar** (`api-calendar-368207`) sur console.cloud.google.com.
   expire tous les 7 jours)
 - Client OAuth de type **Application de bureau**
 
-### Microsoft
-App **Notre Agenda** sur le tenant Oxybol (portal.azure.com → Entra ID).
-- Autorisations déléguées : `Calendars.Read`, `offline_access`
-- Authentification → **Autoriser les flux clients publics : Activé**
-  (nécessaire pour le device code flow)
-- Le secret client Azure n'est **pas** utilisé : le refresh token suffit.
-
 ---
 
 ## Maintenance
-
-**Le refresh token Microsoft peut expirer** (inactivité prolongée,
-changement de mot de passe, révocation). Symptôme : la source Oxybol
-disparaît, un bandeau jaune s'affiche.
-Correctif : relancer `get_token_ms2.py`, mettre à jour `MS_REFRESH_TOKEN`
-dans Vercel, redéployer.
 
 **Le refresh token Google** est permanent tant que l'app reste publiée
 et que l'accès n'est pas révoqué depuis myaccount.google.com/permissions.
@@ -116,3 +99,11 @@ Pas de compte utilisateur, pas de chiffrement de bout en bout.
 Le dépôt peut rester public : il ne contient aucun secret.
 En revanche, **ne jamais commiter de token** — ils vont dans Vercel,
 nulle part ailleurs.
+
+---
+
+## Historique
+
+La source **Outlook / Microsoft 365** a été retirée (inutile pour l'usage
+actuel). Les variables `MS_*` peuvent être supprimées de Vercel, et l'app
+Azure *Notre Agenda* du tenant Oxybol n'a plus d'utilité.
