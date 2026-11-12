@@ -71,10 +71,12 @@ class handler(BaseHTTPRequestHandler):
             return
 
         # --- Mode tableau de bord : /api/agenda?code=XXXX&mode=chronos ---
-        # Tous les chronos Notion (pas seulement ceux de Christophe).
+        # Tous les chronos Notion (pas seulement ceux de Christophe), &year=AAAA.
         if (params.get("mode") or [""])[0] == "chronos":
             try:
-                events = _notion_chronos()
+                an = (params.get("year") or [""])[0]
+                an = int(an) if an.isdigit() and 2000 <= int(an) <= 2100 else date.today().year
+                events = _notion_chronos(an)
                 events.sort(key=lambda e: (e["start"], e["title"]))
                 self._json({
                     "events":      events,
@@ -164,17 +166,16 @@ def _notion():
     })
 
 
-def _notion_chronos():
-    """Tableau de bord : TOUS les chronos de la base (tag « Chrono »), tous statuts confondus,
-    du 1er janvier de l'année en cours, sans limite dans le futur
-    (les options à long terme, 2027 et au-delà, restent visibles).
-    Le filtrage par statut se fait côté navigateur."""
-    debut = date(date.today().year, 1, 1)
+def _notion_chronos(annee):
+    """Tableau de bord : TOUS les chronos de la base (tag « Chrono »), tous statuts
+    confondus, pour une année civile donnée (une année à la fois : requêtes
+    légères). Le filtrage par statut se fait côté navigateur."""
     # La base mélange chronos, séminaires, congés, récups, télétravail, RDV...
     # Seuls les éléments taggés « Chrono » sont des chronos.
     return _notion_pages({
         "and": [
-            {"property": "Date", "date": {"on_or_after": debut.isoformat()}},
+            {"property": "Date", "date": {"on_or_after": f"{annee}-01-01"}},
+            {"property": "Date", "date": {"before":      f"{annee + 1}-01-01"}},
             {"property": "Tags", "multi_select": {"contains": "Chrono"}},
         ]
     })

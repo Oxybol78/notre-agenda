@@ -36,9 +36,12 @@ Notion** (`/api/agenda?code=XXXX&mode=chronos`) :
 - histogramme mensuel (moi / autres chronométreurs), liste et calendrier
   colorés par statut
 
-Fenêtre : du 1er janvier de l'année en cours, sans limite dans le futur
-(les options à long terme restent visibles). Le chiffre « en 2026 » ne compte
-que l'année en cours.
+Navigation **année par année** (‹ • ›, de 2022 à l'année en cours + 4) :
+chaque année est chargée à la demande (`&year=AAAA`) puis gardée en mémoire.
+Les pastilles de statut affichent le **nombre de chronos par statut** pour
+l'année affichée. Pour l'année en cours, un sélecteur permet de voir
+« À venir » ou « Toute l'année ». Dans le calendrier, passer de décembre à
+janvier change d'année.
 
 Les tokens ne sont **jamais** dans le code : uniquement dans les
 variables d'environnement Vercel.
